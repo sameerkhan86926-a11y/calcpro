@@ -11,40 +11,49 @@ const tools = [
   {
     name: "GST Calculator",
     description: "Add or remove GST",
-    href: "#",
+    href: "/tools/gst/",
   },
   {
     name: "SIP Calculator",
     description: "Estimate SIP returns",
-    href: "#",
+    href: "/tools/sip/",
   },
   {
     name: "FD Calculator",
     description: "Calculate fixed deposit maturity",
-    href: "#",
+    href: "/tools/fd/",
   },
   {
     name: "RD Calculator",
     description: "Calculate recurring deposit returns",
-    href: "#",
+    href: "/tools/rd/",
   },
   {
     name: "Simple Interest",
     description: "Calculate simple interest",
-    href: "#",
+    href: "/tools/simple-interest/",
   },
   {
     name: "Compound Interest",
     description: "Calculate compound interest",
-    href: "#",
+    href: "/tools/compound-interest/",
   },
   {
     name: "Profit & Loss",
     description: "Calculate business profit or loss",
-    href: "#",
+    href: "/tools/profit-loss/",
+  },
+  {
+    name: "Discount",
+    description: "Calculate discounted price",
+    href: "/tools/discount/",
+  },
+  {
+    name: "Percentage",
+    description: "Calculate percentage instantly",
+    href: "/tools/percentage/",
   },
 ];
-
 export default function ToolsPage() {
   return (
     <main className="app dark tools-page">
