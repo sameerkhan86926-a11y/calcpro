@@ -49,7 +49,7 @@ export default function SettingsPage() {
     <main className={`app ${dark ? "dark" : "light"} settings-page`}>
       <header className="app-header">
         <div className="brand">
-          <div className="brand-icon">⚙</div>
+          <div className="brand-icon"></div>
           <div>
             <h1>Settings</h1>
             <p>CalcPro Preferences</p>
