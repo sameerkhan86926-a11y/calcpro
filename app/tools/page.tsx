@@ -54,6 +54,12 @@ const tools = [
     description: "Calculate percentage instantly",
     href: "/tools/percentage/",
   },
+  {
+  name: "Reducing Loan",
+  description: "Calculate reducing balance loan & flat comparison",
+  href: "/tools/reducing-loan/",
+},
+
 ];
 
 export default function ToolsPage() {
