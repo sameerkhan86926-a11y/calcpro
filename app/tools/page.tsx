@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 const tools = [
@@ -58,6 +58,14 @@ const tools = [
 
 export default function ToolsPage() {
   const [dark, setDark] = useState(true);
+
+  // Sync theme with localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) {
+      setDark(savedTheme === "dark");
+    }
+  }, []);
 
   return (
     <main className={`app ${dark ? "dark" : "light"} tools-page`}>
@@ -119,13 +127,10 @@ export default function ToolsPage() {
           <small>History</small>
         </Link>
 
-        <button
-          className="nav-item"
-          onClick={() => setDark((value) => !value)}
-        >
-          <span>{dark ? "☼" : "☾"}</span>
-          <small>{dark ? "Light" : "Dark"}</small>
-        </button>
+        <Link href="/settings/" className="nav-item">
+          <span>⚙</span>
+          <small>Settings</small>
+        </Link>
       </nav>
     </main>
   );
