@@ -103,6 +103,114 @@ const playKeySound = () => {
   }
 };
 
+// ---------------- Real Thumbnail Renderer (No Emojis) ----------------
+function VaultThumbnail({
+  file,
+  onClick,
+}: {
+  file: VaultFile;
+  onClick: () => void;
+}) {
+  const [thumbUrl, setThumbUrl] = useState<string>("");
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file.blob);
+    setThumbUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [file.blob]);
+
+  if (file.type.startsWith("image/")) {
+    return (
+      <img
+        src={thumbUrl}
+        alt={file.name}
+        onClick={onClick}
+        style={{
+          width: "100%",
+          height: "120px",
+          objectFit: "cover",
+          cursor: "pointer",
+          display: "block",
+        }}
+      />
+    );
+  }
+
+  if (file.type.startsWith("video/")) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "120px",
+          cursor: "pointer",
+          background: "#000",
+        }}
+      >
+        <video
+          src={thumbUrl}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+          preload="metadata"
+        />
+        <span
+          style={{
+            position: "absolute",
+            bottom: "6px",
+            right: "6px",
+            background: "rgba(0,0,0,0.75)",
+            color: "#fff",
+            fontSize: "10px",
+            padding: "2px 6px",
+            borderRadius: "4px",
+            fontWeight: "bold",
+          }}
+        >
+          ▶ Video
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        height: "120px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        background: "rgba(255,255,255,0.04)",
+        gap: "6px",
+      }}
+    >
+      <div
+        style={{
+          background: "#ef4444",
+          color: "#fff",
+          fontSize: "11px",
+          fontWeight: "bold",
+          padding: "3px 8px",
+          borderRadius: "4px",
+          textTransform: "uppercase",
+        }}
+      >
+        {file.name.split(".").pop() || "FILE"}
+      </div>
+      <small style={{ color: "#a1a1aa", fontSize: "11px" }}>Document</small>
+    </div>
+  );
+}
+
 export default function Home() {
   const [expression, setExpression] = useState("");
   const [display, setDisplay] = useState("0");
@@ -117,17 +225,27 @@ export default function Home() {
   const [vaultOpen, setVaultOpen] = useState(false);
   const [vaultFiles, setVaultFiles] = useState<VaultFile[]>([]);
   const [vaultPasscode, setVaultPasscode] = useState<string | null>(null);
+
+  // First Time Setup States
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
+  const [securityAnswer, setSecurityAnswer] = useState("");
   const [pinError, setPinError] = useState("");
+
+  // Recovery States (Emergency 11223344=)
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoveryInput, setRecoveryInput] = useState("");
+  const [resetNewPin, setResetNewPin] = useState("");
+  const [recoveryError, setRecoveryError] = useState("");
+
+  // Full Screen Preview
   const [previewFile, setPreviewFile] = useState<{ url: string; file: VaultFile } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<number>(0);
 
-  // Load Settings, History, and Hidden Files
   useEffect(() => {
     const savedTheme = localStorage.getItem("calcpro-theme");
     if (savedTheme !== null) setDark(savedTheme === "dark");
@@ -151,7 +269,6 @@ export default function Home() {
       setVaultPasscode(null);
     }
 
-    // Load from IndexedDB
     getFilesFromDB()
       .then((files) => setVaultFiles(files))
       .catch((err) => console.error("Could not load vault items", err));
@@ -214,12 +331,40 @@ export default function Home() {
       setPinError("PINs do not match");
       return;
     }
+    if (!securityAnswer.trim()) {
+      setPinError("Please provide a recovery answer");
+      return;
+    }
+
     localStorage.setItem("calcpro-vault-pin", newPin);
+    localStorage.setItem("calcpro-vault-answer", securityAnswer.trim().toLowerCase());
     setVaultPasscode(newPin);
     setIsSettingPin(false);
     setNewPin("");
     setConfirmPin("");
+    setSecurityAnswer("");
     setPinError("");
+    setVaultOpen(true);
+  };
+
+  const handleRecoverPin = () => {
+    const savedAnswer = localStorage.getItem("calcpro-vault-answer") || "";
+    if (recoveryInput.trim().toLowerCase() !== savedAnswer) {
+      setRecoveryError("Incorrect answer. Please try again.");
+      return;
+    }
+
+    if (resetNewPin.length < 4) {
+      setRecoveryError("New PIN must be at least 4 digits");
+      return;
+    }
+
+    localStorage.setItem("calcpro-vault-pin", resetNewPin);
+    setVaultPasscode(resetNewPin);
+    setIsRecovering(false);
+    setRecoveryInput("");
+    setResetNewPin("");
+    setRecoveryError("");
     setVaultOpen(true);
   };
 
@@ -227,7 +372,17 @@ export default function Home() {
     if (!expression) return;
     const cleanExpr = expression.trim();
 
-    // 1. Agar user ne pehle PIN set kiya hua hai aur wahi type karke '=' dabaya:
+    // 1. Master Emergency Rescue Code (11223344=)
+    if (cleanExpr === "11223344") {
+      triggerHaptic();
+      setExpression("");
+      setDisplay("0");
+      setCursorPos(0);
+      setIsRecovering(true);
+      return;
+    }
+
+    // 2. Secret PIN match to open Vault
     if (vaultPasscode && cleanExpr === vaultPasscode) {
       triggerHaptic();
       setVaultOpen(true);
@@ -237,9 +392,8 @@ export default function Home() {
       return;
     }
 
-    // 2. Agar user ne PIN set nahi kiya aur koi 4+ digit number enter karke unlock karna chahta hai:
-    // (Prompt to set password if no PIN is set)
-    if (!vaultPasscode && /^\d{4,8}$/.test(cleanExpr) && cleanExpr === "1234") {
+    // 3. First-time setup trigger if no PIN exists
+    if (!vaultPasscode && cleanExpr === "1234") {
       triggerHaptic();
       setIsSettingPin(true);
       setExpression("");
@@ -746,7 +900,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* Set Secret PIN Modal (First Time Setup) */}
+      {/* Set Secret PIN Modal */}
       {isSettingPin && (
         <div
           style={{
@@ -773,12 +927,12 @@ export default function Home() {
               border: "1px solid rgba(255,255,255,0.1)",
             }}
           >
-            <h3 style={{ margin: "0 0 8px 0", fontSize: "18px" }}>Set Secret Vault PIN</h3>
-            <p style={{ fontSize: "13px", color: "#71717a", marginBottom: "16px" }}>
-              Enter your own secret PIN. In the future, typing this PIN and pressing <strong>=</strong> will open your hidden vault.
+            <h3 style={{ margin: "0 0 6px 0", fontSize: "18px" }}>Set Secret Vault PIN</h3>
+            <p style={{ fontSize: "12px", color: "#71717a", marginBottom: "14px" }}>
+              Enter your secret PIN. Add a recovery answer in case you forget it.
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <input
                 type="password"
                 maxLength={8}
@@ -789,7 +943,7 @@ export default function Home() {
                   background: dark ? "#27272a" : "#f4f4f5",
                   border: "1px solid #3f3f46",
                   borderRadius: "8px",
-                  padding: "10px 12px",
+                  padding: "10px",
                   color: "inherit",
                   fontSize: "15px",
                   textAlign: "center",
@@ -807,7 +961,7 @@ export default function Home() {
                   background: dark ? "#27272a" : "#f4f4f5",
                   border: "1px solid #3f3f46",
                   borderRadius: "8px",
-                  padding: "10px 12px",
+                  padding: "10px",
                   color: "inherit",
                   fontSize: "15px",
                   textAlign: "center",
@@ -815,18 +969,39 @@ export default function Home() {
                 }}
               />
 
+              <div style={{ textAlign: "left", marginTop: "4px" }}>
+                <span style={{ fontSize: "11px", color: "#a1a1aa" }}>Recovery: What is your birth city?</span>
+                <input
+                  type="text"
+                  placeholder="e.g. Delhi"
+                  value={securityAnswer}
+                  onChange={(e) => setSecurityAnswer(e.target.value)}
+                  style={{
+                    width: "100%",
+                    marginTop: "4px",
+                    background: dark ? "#27272a" : "#f4f4f5",
+                    border: "1px solid #3f3f46",
+                    borderRadius: "8px",
+                    padding: "8px 10px",
+                    color: "inherit",
+                    fontSize: "13px",
+                  }}
+                />
+              </div>
+
               {pinError && (
                 <small style={{ color: "#ef4444", fontSize: "12px", textAlign: "center" }}>
                   {pinError}
                 </small>
               )}
 
-              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+              <div style={{ display: "flex", gap: "10px", marginTop: "6px" }}>
                 <button
                   onClick={() => {
                     setIsSettingPin(false);
                     setNewPin("");
                     setConfirmPin("");
+                    setSecurityAnswer("");
                     setPinError("");
                   }}
                   style={{
@@ -856,6 +1031,124 @@ export default function Home() {
                   }}
                 >
                   Save PIN
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PIN Recovery Modal (Emergency 11223344=) */}
+      {isRecovering && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(12px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              background: dark ? "#18181b" : "#fff",
+              color: dark ? "#fff" : "#18181b",
+              borderRadius: "16px",
+              padding: "24px",
+              width: "100%",
+              maxWidth: "360px",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <h3 style={{ margin: "0 0 6px 0", fontSize: "18px" }}>🔑 PIN Recovery</h3>
+            <p style={{ fontSize: "12px", color: "#71717a", marginBottom: "16px" }}>
+              Emergency code verified. Answer your security question to reset your PIN.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ textAlign: "left" }}>
+                <span style={{ fontSize: "12px", color: "#a1a1aa" }}>Question: What is your birth city?</span>
+                <input
+                  type="text"
+                  placeholder="Your answer"
+                  value={recoveryInput}
+                  onChange={(e) => setRecoveryInput(e.target.value)}
+                  style={{
+                    width: "100%",
+                    marginTop: "4px",
+                    background: dark ? "#27272a" : "#f4f4f5",
+                    border: "1px solid #3f3f46",
+                    borderRadius: "8px",
+                    padding: "10px",
+                    color: "inherit",
+                    fontSize: "14px",
+                  }}
+                />
+              </div>
+
+              <input
+                type="password"
+                maxLength={8}
+                placeholder="Enter New 4-8 Digit PIN"
+                value={resetNewPin}
+                onChange={(e) => setResetNewPin(e.target.value.replace(/\D/g, ""))}
+                style={{
+                  background: dark ? "#27272a" : "#f4f4f5",
+                  border: "1px solid #3f3f46",
+                  borderRadius: "8px",
+                  padding: "10px",
+                  color: "inherit",
+                  fontSize: "15px",
+                  textAlign: "center",
+                  letterSpacing: "4px",
+                }}
+              />
+
+              {recoveryError && (
+                <small style={{ color: "#ef4444", fontSize: "12px", textAlign: "center" }}>
+                  {recoveryError}
+                </small>
+              )}
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                <button
+                  onClick={() => {
+                    setIsRecovering(false);
+                    setRecoveryInput("");
+                    setResetNewPin("");
+                    setRecoveryError("");
+                  }}
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "1px solid #3f3f46",
+                    color: "inherit",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleRecoverPin}
+                  style={{
+                    flex: 1,
+                    background: "#22c55e",
+                    border: "none",
+                    color: "#fff",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                >
+                  Reset PIN
                 </button>
               </div>
             </div>
@@ -934,11 +1227,12 @@ export default function Home() {
             />
           </div>
 
+          {/* Real File Thumbnails */}
           {vaultFiles.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 20px", color: "#71717a" }}>
               <div style={{ fontSize: "40px", marginBottom: "10px" }}>📁</div>
-              <p style={{ margin: 0 }}>Your Vault is empty.</p>
-              <small>Click above to hide confidential photos or files safely.</small>
+              <p style={{ margin: 0, fontWeight: "500" }}>Your Vault is empty.</p>
+              <small>Click above to hide confidential photos, videos, or files.</small>
             </div>
           ) : (
             <div
@@ -961,35 +1255,49 @@ export default function Home() {
                     flexDirection: "column",
                   }}
                 >
-                  <div
-                    onClick={() => openPreview(file)}
-                    style={{
-                      height: "110px",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: "36px",
-                      cursor: "pointer",
-                      background: "rgba(0,0,0,0.3)",
-                    }}
-                  >
-                    {file.type.startsWith("image/") ? "🖼️" : file.type.startsWith("video/") ? "🎬" : "📄"}
-                  </div>
+                  <VaultThumbnail file={file} onClick={() => openPreview(file)} />
 
-                  <div style={{ padding: "8px", fontSize: "11px" }}>
-                    <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ padding: "8px", fontSize: "11px", background: "rgba(0,0,0,0.4)" }}>
+                    <div
+                      style={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        fontWeight: "500",
+                      }}
+                      title={file.name}
+                    >
                       {file.name}
                     </div>
-                    <div style={{ color: "#71717a", marginTop: "4px", display: "flex", justifyContent: "space-between" }}>
-                      <span>{(file.size / 1024).toFixed(0)} KB</span>
+
+                    <div
+                      style={{
+                        color: "#71717a",
+                        marginTop: "4px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span>
+                        {(file.size / (1024 * 1024)).toFixed(1) === "0.0"
+                          ? `${(file.size / 1024).toFixed(0)} KB`
+                          : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                      </span>
+
                       <button
-                        onClick={() => deleteVaultFile(file.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteVaultFile(file.id);
+                        }}
                         style={{
                           background: "transparent",
                           border: "none",
                           color: "#ef4444",
                           cursor: "pointer",
-                          padding: 0,
+                          padding: "2px 4px",
                           fontSize: "12px",
+                          fontWeight: "600",
                         }}
                       >
                         Delete
@@ -1001,7 +1309,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Full Screen File Preview Modal */}
+          {/* Full Screen File Preview */}
           {previewFile && (
             <div
               style={{
