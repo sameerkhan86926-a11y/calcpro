@@ -58,9 +58,15 @@ button {
 .brand-icon {
   width: 42px;
   height: 42px;
+  min-width: 42px;
   border-radius: 13px;
-  background: url('/logo.svg') center/contain no-repeat;
+  background-image: url("/logo.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  display: block;
 }
+
 
 
 .brand h1 {
