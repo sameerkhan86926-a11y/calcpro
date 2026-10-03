@@ -1,6 +1,6 @@
 {
   "appId": "com.calcpro.app",
   "appName": "CalcPro",
-  "webDir": "out/calcpro",
+  "webDir": "out",
   "bundledWebRuntime": false
 }
