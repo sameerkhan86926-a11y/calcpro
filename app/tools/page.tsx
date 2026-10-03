@@ -44,16 +44,17 @@ const tools = [
     href: "/tools/profit-loss/",
   },
   {
-    name: "Discount",
+    name: "Discount Calculator",
     description: "Calculate discounted price",
     href: "/tools/discount/",
   },
   {
-    name: "Percentage",
+    name: "Percentage Calculator",
     description: "Calculate percentage instantly",
     href: "/tools/percentage/",
   },
 ];
+
 export default function ToolsPage() {
   return (
     <main className="app dark tools-page">
@@ -74,64 +75,50 @@ export default function ToolsPage() {
 
       <section className="tools-heading">
         <span>TOOLS</span>
+
         <h2>All Calculators</h2>
+
         <p>
           Powerful calculators for finance, business and everyday use.
         </p>
       </section>
 
       <section className="tools-list">
-        {tools.map((tool) => {
-          const available = tool.href !== "#";
-
-          return available ? (
-            <Link
-              key={tool.name}
-              href={tool.href}
-              className="tool-card"
-            >
-              <div>
-                <h3>{tool.name}</h3>
-                <p>{tool.description}</p>
-              </div>
-
-              <span className="tool-arrow">→</span>
-            </Link>
-          ) : (
-            <div
-              key={tool.name}
-              className="tool-card disabled-tool"
-            >
-              <div>
-                <h3>{tool.name}</h3>
-                <p>{tool.description}</p>
-              </div>
-
-              <span className="coming-soon">Soon</span>
+        {tools.map((tool) => (
+          <Link
+            key={tool.name}
+            href={tool.href}
+            className="tool-card"
+          >
+            <div>
+              <h3>{tool.name}</h3>
+              <p>{tool.description}</p>
             </div>
-          );
-        })}
+
+            <span className="tool-arrow">→</span>
+          </Link>
+        ))}
       </section>
 
       <nav className="bottom-nav">
         <Link href="/" className="nav-item">
-          <span>⌕</span>
-          <small>Calculator</small>
+          <span>Calculator</span>
+          <small>Home</small>
         </Link>
 
         <Link href="/tools/" className="nav-item active">
-          <span>+</span>
-          <small>Tools</small>
+          <span>Tools</span>
+          <small>Calculators</small>
         </Link>
 
         <Link href="/" className="nav-item">
-          <span>≡</span>
-          <small>History</small>
+          <span>History</span>
+          <small>Recent</small>
         </Link>
 
         <Link href="/" className="nav-item">
-          <span>⚙</span>
-          <small>Settings</small>
+          <span>Settings</span>
+          <small>App</small>
         </Link>
       </nav>
     </main>
