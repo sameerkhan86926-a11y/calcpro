@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 // Jo APK phone me chal raha hai, uska version yahan set hota hai
-const CURRENT_APP_VERSION = "1.0.0"; 
+const CURRENT_APP_VERSION = "1.0.1"; 
 
 // Aapka live GitHub Pages version URL
 const LIVE_VERSION_URL = "https://sameerkhan86926-a11y.github.io/calcpro/version.json";
