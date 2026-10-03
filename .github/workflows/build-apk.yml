@@ -33,13 +33,13 @@ jobs:
       - name: Build Next.js App for Mobile
         run: IS_CAPACITOR=true npm run build
 
-      - name: Setup Capacitor Platform
+      - name: Setup Capacitor & Splash Screen Plugin
         run: |
-          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 --save
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/splash-screen@6 --save
           rm -rf android
           npx cap add android
 
-      - name: Inject Custom App Logo / Icon
+      - name: Generate App Icons and Splash Screens
         run: |
           python3 -c '
           import os, shutil
@@ -58,13 +58,26 @@ jobs:
                   break
 
           if src:
-              print(f"Found custom icon: {src}")
+              print(f"Using source graphic: {src}")
               res_dir = "android/app/src/main/res"
+
+              # 1. Launcher icons replace karein
               for root, dirs, files in os.walk(res_dir):
                   for f in files:
                       if "ic_launcher" in f and f.endswith(".png"):
-                          dest = os.path.join(root, f)
-                          shutil.copyfile(src, dest)
+                          shutil.copyfile(src, os.path.join(root, f))
+
+              # 2. Splash screen drawables generate karein
+              splash_dirs = [
+                  "drawable",
+                  "drawable-land-mdpi", "drawable-land-hdpi", "drawable-land-xhdpi", "drawable-land-xxhdpi", "drawable-land-xxxhdpi",
+                  "drawable-port-mdpi", "drawable-port-hdpi", "drawable-port-xhdpi", "drawable-port-xxhdpi", "drawable-port-xxxhdpi"
+              ]
+              for s_dir in splash_dirs:
+                  target_folder = os.path.join(res_dir, s_dir)
+                  os.makedirs(target_folder, exist_ok=True)
+                  shutil.copyfile(src, os.path.join(target_folder, "splash.png"))
+              print("Splash screen assets generated.")
           '
           npx cap sync android
 
@@ -79,17 +92,3 @@ jobs:
         with:
           name: CalcPro-Debug-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
-      # Yeh step Release create karega aur direct URL ko active karega
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.0
-          name: "CalcPro v1.0.0"
-          body: "CalcPro latest Android build with full scientific calculation, vault & responsive UI."
-          draft: false
-          prerelease: false
-          files: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
