@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function PercentagePage() {
+  const [dark, setDark] = useState(true);
   const [percentage, setPercentage] = useState("20");
   const [number, setNumber] = useState("5000");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) setDark(savedTheme === "dark");
+  }, []);
 
   const p = Number(percentage) || 0;
   const n = Number(number) || 0;
@@ -18,7 +24,7 @@ export default function PercentagePage() {
     });
 
   return (
-    <main className="app dark emi-page">
+    <main className={`app ${dark ? "dark" : "light"} emi-page`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
@@ -47,6 +53,7 @@ export default function PercentagePage() {
               type="number"
               value={percentage}
               onChange={(e) => setPercentage(e.target.value)}
+              step="any"
             />
             <span>%</span>
           </div>
@@ -59,6 +66,7 @@ export default function PercentagePage() {
               type="number"
               value={number}
               onChange={(e) => setNumber(e.target.value)}
+              step="any"
             />
           </div>
         </label>
@@ -87,11 +95,11 @@ export default function PercentagePage() {
           <span>+</span>
           <small>Tools</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/#history" className="nav-item">
           <span>≡</span>
           <small>History</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/settings/" className="nav-item">
           <span>⚙</span>
           <small>Settings</small>
         </Link>
