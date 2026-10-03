@@ -32,15 +32,22 @@ jobs:
         run: |
           python3 -c '
           import json, os
-          with open("public/version.json", "r") as f:
-              data = json.load(f)
-          v = data.get("version", "1.0.0").strip()
-          w = data.get("whatsNew", "New updates and fixes.").strip()
+
+          filepath = "public/version.json"
+          if os.path.exists(filepath):
+              with open(filepath, "r") as f:
+                  data = json.load(f)
+              v = data.get("version", "1.0.1").strip()
+              w = data.get("whatsNew", "New updates and fixes.").strip()
+          else:
+              v = "1.0.1"
+              w = "New release build."
+
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"version={v}\n")
               out.write(f"tag=v{v}\n")
               out.write(f"notes={w}\n")
-          print(f"Detected Version: {v}")
+          print(f"Target Release Version: {v}")
           '
 
       - name: Install Project Dependencies
@@ -55,7 +62,7 @@ jobs:
           rm -rf android
           npx cap add android
 
-      - name: Inject Custom App Icons and Splash
+      - name: Inject Custom App Icons
         run: |
           python3 -c '
           import os, shutil
