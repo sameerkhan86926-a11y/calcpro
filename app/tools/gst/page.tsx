@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function GSTPage() {
+  const [dark, setDark] = useState(true);
   const [amount, setAmount] = useState("1000");
   const [rate, setRate] = useState("18");
   const [mode, setMode] = useState<"add" | "remove">("add");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) setDark(savedTheme === "dark");
+  }, []);
 
   const value = Number(amount) || 0;
   const gstRate = Number(rate) || 0;
@@ -26,13 +32,15 @@ export default function GSTPage() {
       ? value + gst
       : value;
 
+  const halfGst = gst / 2;
+
   const money = (n: number) =>
     n.toLocaleString("en-IN", {
       maximumFractionDigits: 2,
     });
 
   return (
-    <main className="app dark emi-page">
+    <main className={`app ${dark ? "dark" : "light"} emi-page`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
@@ -78,6 +86,7 @@ export default function GSTPage() {
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              min="0"
             />
           </div>
         </label>
@@ -89,6 +98,8 @@ export default function GSTPage() {
               type="number"
               value={rate}
               onChange={(e) => setRate(e.target.value)}
+              min="0"
+              step="0.1"
             />
             <span>%</span>
           </div>
@@ -96,23 +107,28 @@ export default function GSTPage() {
       </section>
 
       <section className="emi-result">
-        <p>GST Amount</p>
+        <p>Total GST</p>
         <strong>₹{money(gst)}</strong>
 
         <div className="result-divider" />
 
         <div className="result-row">
-          <span>Base Amount</span>
+          <span>Base / Net Amount</span>
           <strong>₹{money(baseAmount)}</strong>
         </div>
 
         <div className="result-row">
-          <span>GST</span>
-          <strong>₹{money(gst)}</strong>
+          <span>CGST ({(gstRate / 2).toFixed(1)}%)</span>
+          <strong>₹{money(halfGst)}</strong>
         </div>
 
         <div className="result-row">
-          <span>Final Amount</span>
+          <span>SGST ({(gstRate / 2).toFixed(1)}%)</span>
+          <strong>₹{money(halfGst)}</strong>
+        </div>
+
+        <div className="result-row">
+          <span>Total / Gross Amount</span>
           <strong>₹{money(finalAmount)}</strong>
         </div>
       </section>
@@ -126,11 +142,11 @@ export default function GSTPage() {
           <span>+</span>
           <small>Tools</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/#history" className="nav-item">
           <span>≡</span>
           <small>History</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/settings/" className="nav-item">
           <span>⚙</span>
           <small>Settings</small>
         </Link>
