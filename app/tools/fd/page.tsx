@@ -31,7 +31,7 @@ export default function FDPage() {
     <main className={`app ${dark ? "dark" : "light"} emi-page`}>
       <header className="app-header">
         <div className="brand">
-          <div className="brand-icon">C</div>
+          <div className="brand-icon"></div>
           <div>
             <h1>CalcPro</h1>
             <p>FD Calculator</p>
