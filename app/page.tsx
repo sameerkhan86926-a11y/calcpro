@@ -7,66 +7,22 @@ type HistoryItem = {
   result: string;
 };
 
-const initialKeys = [
-  ["AC", "DEL", "%", "÷"],
-  ["7", "8", "9", "×"],
-  ["4", "5", "6", "−"],
-  ["1", "2", "3", "+"],
-  ["0", ".", "=", "="],
-];
-
-function formatNumber(value: number) {
-  if (!Number.isFinite(value)) return "Error";
-
-  return Number(value.toFixed(12)).toLocaleString("en-IN", {
-    maximumFractionDigits: 12,
-  });
-}
-
-function calculateExpression(expression: string) {
-  try {
-    let exp = expression
-      .replace(/,/g, "")
-      .replace(/×/g, "*")
-      .replace(/÷/g, "/")
-      .replace(/−/g, "-")
-      .replace(/%/g, "/100");
-
-    if (!/^[0-9+\-*/().\s]+$/.test(exp)) {
-      return null;
-    }
-
-    if (!exp.trim()) {
-      return 0;
-    }
-
-    const result = Function(`"use strict"; return (${exp})`)();
-
-    if (typeof result !== "number" || !Number.isFinite(result)) {
-      return null;
-    }
-
-    return result;
-  } catch {
-    return null;
-  }
-}
-
 export default function Home() {
   const [expression, setExpression] = useState("");
   const [display, setDisplay] = useState("0");
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [mode, setMode] = useState<"basic" | "scientific">("basic");
+  const [scientific, setScientific] = useState(false);
+  const [dark, setDark] = useState(true);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("calcpro-history");
+    const saved = localStorage.getItem("calcpro-history");
 
-      if (saved) {
+    if (saved) {
+      try {
         setHistory(JSON.parse(saved));
+      } catch {
+        setHistory([]);
       }
-    } catch {
-      // Ignore invalid local storage data.
     }
   }, []);
 
@@ -74,116 +30,152 @@ export default function Home() {
     localStorage.setItem("calcpro-history", JSON.stringify(history));
   }, [history]);
 
-  function clearAll() {
-    setExpression("");
-    setDisplay("0");
-  }
+  const formatNumber = (value: number) => {
+    if (!Number.isFinite(value)) return "Error";
 
-  function deleteLast() {
-    if (expression.length === 0) return;
+    return Number(value.toFixed(10)).toLocaleString("en-IN", {
+      maximumFractionDigits: 10,
+    });
+  };
 
-    const next = expression.slice(0, -1);
+  const calculate = () => {
+    if (!expression) return;
 
-    setExpression(next);
-    setDisplay(next || "0");
-  }
+    try {
+      const safeExpression = expression.replace(/,/g, "");
 
-  function addValue(value: string) {
-    if (display === "Error") {
+      if (!/^[0-9+\-*/().%\s]+$/.test(safeExpression)) {
+        throw new Error("Invalid");
+      }
+
+      const result = Function(
+        `"use strict"; return (${safeExpression})`
+      )();
+
+      const formatted = formatNumber(Number(result));
+
+      setDisplay(formatted);
+      setHistory((prev) => [
+        {
+          expression,
+          result: formatted,
+        },
+        ...prev,
+      ].slice(0, 30));
+
+      setExpression(String(result));
+    } catch {
+      setDisplay("Error");
+    }
+  };
+
+  const press = (key: string) => {
+    if (key === "AC") {
       setExpression("");
       setDisplay("0");
-    }
-
-    const nextExpression = expression + value;
-
-    setExpression(nextExpression);
-
-    const result = calculateExpression(nextExpression);
-
-    if (result !== null) {
-      setDisplay(formatNumber(result));
-    } else {
-      setDisplay(nextExpression);
-    }
-  }
-
-  function calculate() {
-    if (!expression.trim()) return;
-
-    const result = calculateExpression(expression);
-
-    if (result === null) {
-      setDisplay("Error");
       return;
     }
 
-    const formatted = formatNumber(result);
-
-    setHistory((previous) => [
-      {
-        expression,
-        result: formatted,
-      },
-      ...previous,
-    ].slice(0, 20));
-
-    setDisplay(formatted);
-    setExpression(String(result));
-  }
-
-  function handleKey(value: string) {
-    if (value === "AC") {
-      clearAll();
+    if (key === "DEL") {
+      const next = expression.slice(0, -1);
+      setExpression(next);
+      setDisplay(next || "0");
       return;
     }
 
-    if (value === "DEL") {
-      deleteLast();
-      return;
-    }
-
-    if (value === "=") {
+    if (key === "=") {
       calculate();
       return;
     }
 
-    addValue(value);
-  }
+    if (key === "√") {
+      const value = Number(expression || display.replace(/,/g, ""));
+
+      if (!Number.isNaN(value)) {
+        const result = Math.sqrt(value);
+        setExpression(String(result));
+        setDisplay(formatNumber(result));
+      }
+
+      return;
+    }
+
+    if (key === "x²") {
+      const value = Number(expression || display.replace(/,/g, ""));
+
+      if (!Number.isNaN(value)) {
+        const result = value ** 2;
+        setExpression(String(result));
+        setDisplay(formatNumber(result));
+      }
+
+      return;
+    }
+
+    if (key === "π") {
+      setExpression((prev) => prev + Math.PI);
+      setDisplay((prev) => (prev === "0" ? "π" : prev + "π"));
+      return;
+    }
+
+    if (key === "sin" || key === "cos" || key === "tan") {
+      const value = Number(expression || display.replace(/,/g, ""));
+
+      if (!Number.isNaN(value)) {
+        const radians = (value * Math.PI) / 180;
+
+        const result =
+          key === "sin"
+            ? Math.sin(radians)
+            : key === "cos"
+              ? Math.cos(radians)
+              : Math.tan(radians);
+
+        setExpression(String(result));
+        setDisplay(formatNumber(result));
+      }
+
+      return;
+    }
+
+    const operators = ["+", "-", "*", "/", "%"];
+
+    if (operators.includes(key)) {
+      if (!expression && key !== "-") return;
+
+      const last = expression.slice(-1);
+
+      if (operators.includes(last)) {
+        setExpression(expression.slice(0, -1) + key);
+      } else {
+        setExpression(expression + key);
+      }
+
+      return;
+    }
+
+    const next = expression + key;
+
+    setExpression(next);
+    setDisplay(next);
+  };
 
   useEffect(() => {
-    function handleKeyboard(event: KeyboardEvent) {
+    const handleKeyboard = (event: KeyboardEvent) => {
       const key = event.key;
 
-      if (
-        (key >= "0" && key <= "9") ||
-        key === "." ||
-        key === "+" ||
-        key === "-" ||
-        key === "*" ||
-        key === "/" ||
-        key === "%"
-      ) {
-        event.preventDefault();
-
-        const mapped =
-          key === "*" ? "×" : key === "/" ? "÷" : key === "-" ? "−" : key;
-
-        addValue(mapped);
+      if (/^[0-9.]$/.test(key)) {
+        press(key);
+      } else if (["+", "-", "*", "/", "%"].includes(key)) {
+        press(key);
+      } else if (key === "Enter" || key === "=") {
+        press("=");
+      } else if (key === "Backspace") {
+        press("DEL");
+      } else if (key === "Escape") {
+        press("AC");
       }
-
-      if (key === "Enter" || key === "=") {
-        event.preventDefault();
-        calculate();
-      }
-
-      if (key === "Escape") {
-        clearAll();
-      }
-
-      if (key === "Backspace") {
-        deleteLast();
-      }
-    }
+    };
 
     window.addEventListener("keydown", handleKeyboard);
 
@@ -192,250 +184,197 @@ export default function Home() {
     };
   });
 
-  function scientific(value: string) {
-    if (value === "√") {
-      const number = Number(display.replace(/,/g, ""));
-      if (!Number.isFinite(number) || number < 0) return;
+  const basicKeys = [
+    "AC",
+    "DEL",
+    "%",
+    "/",
+    "7",
+    "8",
+    "9",
+    "*",
+    "4",
+    "5",
+    "6",
+    "-",
+    "1",
+    "2",
+    "3",
+    "+",
+    "0",
+    ".",
+    "=",
+  ];
 
-      const result = Math.sqrt(number);
-      setExpression(String(result));
-      setDisplay(formatNumber(result));
-      return;
-    }
-
-    if (value === "x²") {
-      const number = Number(display.replace(/,/g, ""));
-      if (!Number.isFinite(number)) return;
-
-      const result = number ** 2;
-      setExpression(String(result));
-      setDisplay(formatNumber(result));
-      return;
-    }
-
-    if (value === "x³") {
-      const number = Number(display.replace(/,/g, ""));
-      if (!Number.isFinite(number)) return;
-
-      const result = number ** 3;
-      setExpression(String(result));
-      setDisplay(formatNumber(result));
-      return;
-    }
-
-    if (value === "π") {
-      addValue(String(Math.PI));
-      return;
-    }
-
-    if (value === "sin") {
-      const number = Number(display.replace(/,/g, ""));
-      const result = Math.sin((number * Math.PI) / 180);
-      setExpression(String(result));
-      setDisplay(formatNumber(result));
-      return;
-    }
-
-    if (value === "cos") {
-      const number = Number(display.replace(/,/g, ""));
-      const result = Math.cos((number * Math.PI) / 180);
-      setExpression(String(result));
-      setDisplay(formatNumber(result));
-      return;
-    }
-
-    if (value === "tan") {
-      const number = Number(display.replace(/,/g, ""));
-      const result = Math.tan((number * Math.PI) / 180);
-      setExpression(String(result));
-      setDisplay(formatNumber(result));
-    }
-  }
+  const scientificKeys = [
+    "sin",
+    "cos",
+    "tan",
+    "√",
+    "x²",
+    "π",
+  ];
 
   return (
-    <div className="calc-app">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <div className="brand">
-            <div className="brand-mark">C</div>
+    <main className={`app ${dark ? "dark" : "light"}`}>
+      <header className="app-header">
+        <div className="brand">
+          <div className="brand-icon">C</div>
 
-            <div>
-              <div className="brand-name">CalcPro</div>
-              <div className="brand-subtitle">
-                Smart Professional Calculator
-              </div>
-            </div>
+          <div>
+            <h1>CalcPro</h1>
+            <p>Smart Calculator</p>
           </div>
+        </div>
 
-          <div className="topbar-actions">
+        <button
+          className="icon-button"
+          onClick={() => setDark((value) => !value)}
+          aria-label="Toggle theme"
+        >
+          {dark ? "☼" : "☾"}
+        </button>
+      </header>
+
+      <section className="calculator-screen">
+        <div className="expression">
+          {expression || "0"}
+        </div>
+
+        <div className="result">
+          {display}
+        </div>
+      </section>
+
+      <div className="mode-row">
+        <button
+          className={!scientific ? "mode active" : "mode"}
+          onClick={() => setScientific(false)}
+        >
+          Basic
+        </button>
+
+        <button
+          className={scientific ? "mode active" : "mode"}
+          onClick={() => setScientific(true)}
+        >
+          Scientific
+        </button>
+      </div>
+
+      {scientific && (
+        <section className="scientific-panel">
+          {scientificKeys.map((key) => (
             <button
-              className="header-button"
-              onClick={clearAll}
-              aria-label="Clear calculator"
+              key={key}
+              className="scientific-key"
+              onClick={() => press(key)}
+            >
+              {key}
+            </button>
+          ))}
+        </section>
+      )}
+
+      <section className="keypad">
+        {basicKeys.map((key) => {
+          const isOperator = ["+", "-", "*", "/", "%"].includes(key);
+          const isDanger = key === "AC";
+          const isUtility = key === "DEL";
+          const isEqual = key === "=";
+
+          return (
+            <button
+              key={key}
+              className={[
+                "key",
+                isOperator ? "operator" : "",
+                isDanger ? "danger" : "",
+                isUtility ? "utility" : "",
+                isEqual ? "equals" : "",
+              ].join(" ")}
+              onClick={() => press(key)}
+            >
+              {key === "*" ? "×" : key === "/" ? "÷" : key}
+            </button>
+          );
+        })}
+      </section>
+
+      <section className="quick-tools">
+        <div className="section-title">
+          <span>Quick Tools</span>
+          <span className="small-text">Coming soon</span>
+        </div>
+
+        <div className="tool-grid">
+          <button>EMI</button>
+          <button>GST</button>
+          <button>SIP</button>
+          <button>Interest</button>
+        </div>
+      </section>
+
+      <section className="history-section">
+        <div className="section-title">
+          <span>Recent Calculations</span>
+
+          {history.length > 0 && (
+            <button
+              className="clear-history"
+              onClick={() => setHistory([])}
             >
               Clear
             </button>
-          </div>
+          )}
         </div>
-      </header>
 
-      <main className="main">
-        <section className="hero">
-          <span className="hero-eyebrow">Fast • Accurate • Professional</span>
-
-          <h1>Everything you need to calculate.</h1>
-
-          <p>
-            A clean, powerful calculator built for everyday calculations,
-            scientific operations and future finance tools.
-          </p>
-        </section>
-
-        <section className="calculator-layout">
-          <div className="calculator-card">
-            <div className="display">
-              <div className="display-expression">
-                {expression || "Ready to calculate"}
-              </div>
-
-              <div className="display-result">{display}</div>
-            </div>
-
-            <div className="calculator-toolbar">
-              <div className="mode-group">
-                <button
-                  className={`mode-button ${
-                    mode === "basic" ? "active" : ""
-                  }`}
-                  onClick={() => setMode("basic")}
-                >
-                  Basic
-                </button>
-
-                <button
-                  className={`mode-button ${
-                    mode === "scientific" ? "active" : ""
-                  }`}
-                  onClick={() => setMode("scientific")}
-                >
-                  Scientific
-                </button>
-              </div>
-
-              <button className="small-action" onClick={deleteLast}>
-                Delete
-              </button>
-            </div>
-
-            {mode === "scientific" && (
-              <div className="keypad">
-                {["sin", "cos", "tan", "√", "x²", "x³", "π"].map(
-                  (item) => (
-                    <button
-                      key={item}
-                      className="key utility"
-                      onClick={() => scientific(item)}
-                    >
-                      {item}
-                    </button>
-                  ),
-                )}
-              </div>
-            )}
-
-            <div className="keypad">
-              {initialKeys.flat().map((key, index) => {
-                const isEquals = key === "=" && index === 19;
-                const isOperator = ["÷", "×", "−", "+"].includes(key);
-
-                return (
-                  <button
-                    key={`${key}-${index}`}
-                    className={`key ${
-                      isEquals ? "equals" : ""
-                    } ${isOperator ? "operator" : ""} ${
-                      key === "AC" ? "danger" : ""
-                    } ${key === "DEL" ? "utility" : ""} ${
-                      key === "0" ? "zero" : ""
-                    }`}
-                    onClick={() => handleKey(key)}
-                  >
-                    {key}
-                  </button>
-                );
-              })}
-            </div>
+        {history.length === 0 ? (
+          <div className="empty-history">
+            <div className="empty-icon">=</div>
+            <p>No calculations yet</p>
+            <span>Your recent calculations will appear here.</span>
           </div>
+        ) : (
+          <div className="history-list">
+            {history.slice(0, 8).map((item, index) => (
+              <button
+                className="history-item"
+                key={`${item.expression}-${index}`}
+                onClick={() => {
+                  setExpression(item.result.replace(/,/g, ""));
+                  setDisplay(item.result);
+                }}
+              >
+                <span>{item.expression}</span>
+                <strong>{item.result}</strong>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
 
-          <aside className="history-card">
-            <div className="history-header">
-              <h2 className="history-title">Calculation History</h2>
+      <nav className="bottom-nav">
+        <button className="nav-item active">
+          <span>⌕</span>
+          <small>Calculator</small>
+        </button>
 
-              {history.length > 0 && (
-                <button
-                  className="history-clear"
-                  onClick={() => setHistory([])}
-                >
-                  Clear history
-                </button>
-              )}
-            </div>
+        <button className="nav-item">
+          <span>+</span>
+          <small>Tools</small>
+        </button>
 
-            {history.length === 0 ? (
-              <div className="history-empty">
-                Your recent calculations will appear here.
-              </div>
-            ) : (
-              <div className="history-list">
-                {history.map((item, index) => (
-                  <button
-                    key={`${item.expression}-${index}`}
-                    className="history-item"
-                    onClick={() => {
-                      setExpression(item.expression);
-                      setDisplay(item.result.replace(/,/g, ""));
-                    }}
-                  >
-                    <div className="history-expression">
-                      {item.expression}
-                    </div>
+        <button className="nav-item">
+          <span>≡</span>
+          <small>History</small>
+        </button>
 
-                    <div className="history-result">= {item.result}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </aside>
-        </section>
-
-        <section className="features">
-          <article className="feature-card">
-            <h3>Fast calculations</h3>
-            <p>
-              Instant results with keyboard and touch-friendly controls.
-            </p>
-          </article>
-
-          <article className="feature-card">
-            <h3>Calculation history</h3>
-            <p>
-              Your recent calculations are saved locally on your device.
-            </p>
-          </article>
-
-          <article className="feature-card">
-            <h3>Built to expand</h3>
-            <p>
-              Finance, business, GST, EMI, SIP and conversion tools will be
-              added next.
-            </p>
-          </article>
-        </section>
-
-        <footer className="footer">
-          © 2026 CalcPro. Built for fast and accurate calculations.
-        </footer>
-      </main>
-    </div>
+        <button className="nav-item">
+          <span>⚙</span>
+          <small>Settings</small>
+        </button>
+      </nav>
+    </main>
   );
 }
