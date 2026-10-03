@@ -646,3 +646,182 @@ button {
   overflow-x: auto;
   white-space: nowrap;
 }
+/* Settings Page Styling */
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 10px;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.settings-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #71717a;
+  margin-left: 5px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  gap: 12px;
+}
+
+.light .settings-row {
+  background: #ffffff;
+  border-color: #e4e4e7;
+}
+
+.settings-row strong {
+  font-size: 14px;
+}
+
+.settings-row p {
+  font-size: 11px;
+  color: #a1a1aa;
+  margin-top: 2px;
+}
+
+.pill-btn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: #27272a;
+  color: #a1a1aa;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pill-btn.active {
+  background: #ffffff;
+  color: #111111;
+}
+
+.light .pill-btn.active {
+  background: #18181b;
+  color: #ffffff;
+}
+
+.toggle-switch {
+  display: flex;
+  gap: 5px;
+  background: #222225;
+  padding: 3px;
+  border-radius: 12px;
+}
+
+.settings-select {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #27272a;
+  color: #ffffff;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.light .settings-select {
+  background: #e4e4e7;
+  color: #18181b;
+}
+
+.danger-btn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.settings-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 16px;
+  border-radius: 16px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.light .settings-link-row {
+  background: #ffffff;
+  border-color: #e4e4e7;
+}
+
+/* Modal Popup */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(5px);
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal-content {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 20px;
+  padding: 22px;
+  max-width: 400px;
+  width: 100%;
+}
+
+.light .modal-content {
+  background: #ffffff;
+  border-color: #e4e4e7;
+}
+
+.modal-content h3 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.modal-version {
+  font-size: 11px;
+  color: #71717a;
+  margin-bottom: 12px;
+}
+
+.modal-content p {
+  font-size: 13px;
+  color: #a1a1aa;
+  line-height: 1.5;
+}
+
+.modal-close-btn {
+  width: 100%;
+  margin-top: 18px;
+  padding: 11px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111111;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.light .modal-close-btn {
+  background: #18181b;
+  color: #ffffff;
+}
+
