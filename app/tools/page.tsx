@@ -5,6 +5,11 @@ import Link from "next/link";
 
 const tools = [
   {
+    name: "Cash Counter & Denomination",
+    description: "Count currency notes & create WhatsApp cash slips",
+    href: "/tools/cash-counter/",
+  },
+  {
     name: "EMI Calculator",
     description: "Calculate monthly loan EMI",
     href: "/tools/emi/",
@@ -55,11 +60,10 @@ const tools = [
     href: "/tools/percentage/",
   },
   {
-  name: "Reducing Loan",
-  description: "Calculate reducing balance loan & flat comparison",
-  href: "/tools/reducing-loan/",
-},
-
+    name: "Reducing Loan",
+    description: "Calculate reducing balance loan & flat comparison",
+    href: "/tools/reducing-loan/",
+  },
 ];
 
 export default function ToolsPage() {
