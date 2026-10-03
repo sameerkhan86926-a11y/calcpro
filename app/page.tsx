@@ -103,6 +103,15 @@ const playKeySound = () => {
   }
 };
 
+// ---------------- Math Helper ----------------
+const factorial = (n: number): number => {
+  if (n < 0 || !Number.isInteger(n)) return NaN;
+  if (n === 0 || n === 1) return 1;
+  let res = 1;
+  for (let i = 2; i <= Math.min(n, 170); i++) res *= i;
+  return res;
+};
+
 // ---------------- Real Thumbnail Component ----------------
 function VaultThumbnail({
   file,
@@ -216,6 +225,8 @@ export default function Home() {
   const [display, setDisplay] = useState("0");
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [scientific, setScientific] = useState(false);
+  const [isRad, setIsRad] = useState(false); // DEG vs RAD toggle
+  const [isSecond, setIsSecond] = useState(false); // 2nd function toggle (sin vs sin⁻¹)
   const [dark, setDark] = useState(true);
   const [locale, setLocale] = useState("en-IN");
   const [isCalculated, setIsCalculated] = useState(false);
@@ -311,16 +322,20 @@ export default function Home() {
 
   const evaluateExpression = useCallback((expr: string): number => {
     let sanitized = expr.replace(/,/g, "").trim();
-    sanitized = sanitized.replace(/[+\-*/%]+$/, "");
+    sanitized = sanitized.replace(/[+\-*/%^]+$/, "");
     if (!sanitized) return 0;
 
+    // Power operator replace (^ -> **)
+    sanitized = sanitized.replace(/\^/g, "**");
+
+    // Percentage substitutions
     sanitized = sanitized.replace(
       /(\d+(?:\.\d+)?)\s*([+\-])\s*(\d+(?:\.\d+)?)%/g,
       "($1 $2 ($1 * $3 / 100))"
     );
     sanitized = sanitized.replace(/(\d+(?:\.\d+)?)%/g, "($1 / 100)");
 
-    if (!/^[0-9+\-*/().\s]+$/.test(sanitized)) {
+    if (!/^[0-9+\-*/().\s*^]+$/.test(sanitized)) {
       throw new Error("Invalid Syntax");
     }
 
@@ -328,7 +343,7 @@ export default function Home() {
     return Number(res);
   }, []);
 
-  // REAL-TIME LIVE CALCULATION: Bada number typing ke sath-sath calculate hokar badhega
+  // REAL-TIME LIVE CALCULATION
   useEffect(() => {
     if (!expression) {
       if (!isCalculated) setDisplay("0");
@@ -337,14 +352,13 @@ export default function Home() {
 
     if (isCalculated) return;
 
-    // Secret PIN ya Emergency Code match hone par live number calculate na kare
     const cleanExpr = expression.trim();
     if (cleanExpr === "11223344" || (vaultPasscode && cleanExpr === vaultPasscode)) {
       return;
     }
 
     try {
-      const sanitized = cleanExpr.replace(/[+\-*/%]+$/, "");
+      const sanitized = cleanExpr.replace(/[+\-*/%^]+$/, "");
       if (!sanitized) return;
 
       const liveVal = evaluateExpression(sanitized);
@@ -352,11 +366,10 @@ export default function Home() {
         setDisplay(formatNumber(liveVal));
       }
     } catch {
-      // Incomplete syntax par display atka nahi rahega
+      // Incomplete syntax
     }
   }, [expression, isCalculated, vaultPasscode, evaluateExpression, formatNumber]);
 
-  // Expression overflow par automatic right scroll
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.scrollLeft = inputRef.current.scrollWidth;
@@ -594,34 +607,7 @@ export default function Home() {
         return;
       }
 
-      if (key === "√") {
-        const value = Number(expression || display.replace(/,/g, ""));
-        if (!Number.isNaN(value) && value >= 0) {
-          const result = Math.sqrt(value);
-          const str = String(result);
-          setExpression(str);
-          setDisplay(formatNumber(result));
-          setCursorPos(str.length);
-          setIsCalculated(true);
-        } else {
-          setDisplay("Error");
-        }
-        return;
-      }
-
-      if (key === "x²") {
-        const value = Number(expression || display.replace(/,/g, ""));
-        if (!Number.isNaN(value)) {
-          const result = value ** 2;
-          const str = String(result);
-          setExpression(str);
-          setDisplay(formatNumber(result));
-          setCursorPos(str.length);
-          setIsCalculated(true);
-        }
-        return;
-      }
-
+      // Constant: π
       if (key === "π") {
         const val = String(Math.PI);
         if (isCalculated || !expression) {
@@ -636,17 +622,41 @@ export default function Home() {
         return;
       }
 
-      if (key === "sin" || key === "cos" || key === "tan") {
-        const value = Number(expression || display.replace(/,/g, ""));
-        if (!Number.isNaN(value)) {
-          const radians = (value * Math.PI) / 180;
-          const result =
-            key === "sin"
-              ? Math.sin(radians)
-              : key === "cos"
-              ? Math.cos(radians)
-              : Math.tan(radians);
+      // Constant: e
+      if (key === "e") {
+        const val = String(Math.E);
+        if (isCalculated || !expression) {
+          setExpression(val);
+          setCursorPos(val.length);
+        } else {
+          const next = expression.slice(0, currentPos) + val + expression.slice(currentPos);
+          setExpression(next);
+          updateInputCursor(currentPos + val.length);
+        }
+        setIsCalculated(false);
+        return;
+      }
 
+      // Immediate Unary Scientific Functions
+      const currentNum = Number(expression || display.replace(/,/g, ""));
+
+      if (key === "√") {
+        if (!Number.isNaN(currentNum) && currentNum >= 0) {
+          const result = Math.sqrt(currentNum);
+          const str = String(result);
+          setExpression(str);
+          setDisplay(formatNumber(result));
+          setCursorPos(str.length);
+          setIsCalculated(true);
+        } else {
+          setDisplay("Error");
+        }
+        return;
+      }
+
+      if (key === "x²") {
+        if (!Number.isNaN(currentNum)) {
+          const result = currentNum ** 2;
           const str = String(result);
           setExpression(str);
           setDisplay(formatNumber(result));
@@ -656,7 +666,107 @@ export default function Home() {
         return;
       }
 
-      const operators = ["+", "-", "*", "/", "%"];
+      if (key === "n!") {
+        if (!Number.isNaN(currentNum)) {
+          const result = factorial(currentNum);
+          if (Number.isFinite(result)) {
+            const str = String(result);
+            setExpression(str);
+            setDisplay(formatNumber(result));
+            setCursorPos(str.length);
+            setIsCalculated(true);
+          } else {
+            setDisplay("Error");
+          }
+        }
+        return;
+      }
+
+      if (key === "log") {
+        if (!Number.isNaN(currentNum) && currentNum > 0) {
+          const result = Math.log10(currentNum);
+          const str = String(result);
+          setExpression(str);
+          setDisplay(formatNumber(result));
+          setCursorPos(str.length);
+          setIsCalculated(true);
+        } else {
+          setDisplay("Error");
+        }
+        return;
+      }
+
+      if (key === "ln") {
+        if (!Number.isNaN(currentNum) && currentNum > 0) {
+          const result = Math.log(currentNum);
+          const str = String(result);
+          setExpression(str);
+          setDisplay(formatNumber(result));
+          setCursorPos(str.length);
+          setIsCalculated(true);
+        } else {
+          setDisplay("Error");
+        }
+        return;
+      }
+
+      // Trigonometry (Standard & Inverse with DEG/RAD Support)
+      if (["sin", "cos", "tan", "sin⁻¹", "cos⁻¹", "tan⁻¹"].includes(key)) {
+        if (!Number.isNaN(currentNum)) {
+          let result = 0;
+
+          if (key === "sin" || key === "cos" || key === "tan") {
+            const angleInRad = isRad ? currentNum : (currentNum * Math.PI) / 180;
+            result =
+              key === "sin"
+                ? Math.sin(angleInRad)
+                : key === "cos"
+                ? Math.cos(angleInRad)
+                : Math.tan(angleInRad);
+          } else {
+            // Inverse functions
+            let radVal = 0;
+            if (key === "sin⁻¹") radVal = Math.asin(currentNum);
+            else if (key === "cos⁻¹") radVal = Math.acos(currentNum);
+            else radVal = Math.atan(currentNum);
+
+            result = isRad ? radVal : (radVal * 180) / Math.PI;
+          }
+
+          if (Number.isFinite(result)) {
+            const str = String(result);
+            setExpression(str);
+            setDisplay(formatNumber(result));
+            setCursorPos(str.length);
+            setIsCalculated(true);
+          } else {
+            setDisplay("Error");
+          }
+        }
+        return;
+      }
+
+      // Power / Exponent Operator (xʸ -> ^)
+      if (key === "xʸ") {
+        if (!expression) return;
+        setIsCalculated(false);
+        const next = expression.slice(0, currentPos) + "^" + expression.slice(currentPos);
+        setExpression(next);
+        updateInputCursor(currentPos + 1);
+        return;
+      }
+
+      // Parentheses `(` and `)`
+      if (key === "(" || key === ")") {
+        setIsCalculated(false);
+        const next = expression.slice(0, currentPos) + key + expression.slice(currentPos);
+        setExpression(next);
+        updateInputCursor(currentPos + 1);
+        return;
+      }
+
+      // Standard Operators
+      const operators = ["+", "-", "*", "/", "%", "^"];
       if (operators.includes(key)) {
         setIsCalculated(false);
         if (!expression && key !== "-") return;
@@ -677,8 +787,8 @@ export default function Home() {
       if (key === ".") {
         const leftExpr = expression.slice(0, currentPos);
         const rightExpr = expression.slice(currentPos);
-        const lastLeftSegment = leftExpr.split(/[+\-*/%]/).pop() || "";
-        const nextRightSegment = rightExpr.split(/[+\-*/%]/)[0] || "";
+        const lastLeftSegment = leftExpr.split(/[+\-*/%^()]/).pop() || "";
+        const nextRightSegment = rightExpr.split(/[+\-*/%^()]/)[0] || "";
         if (lastLeftSegment.includes(".") || nextRightSegment.includes(".")) return;
       }
 
@@ -693,7 +803,7 @@ export default function Home() {
       setExpression(next);
       updateInputCursor(currentPos + key.length);
     },
-    [expression, display, cursorPos, isCalculated, calculate, formatNumber]
+    [expression, display, cursorPos, isCalculated, isRad, calculate, formatNumber]
   );
 
   const basicKeys = [
@@ -703,8 +813,6 @@ export default function Home() {
     "1", "2", "3", "+",
     "0", ".", "=",
   ];
-
-  const scientificKeys = ["sin", "cos", "tan", "√", "x²", "π"];
 
   return (
     <main className={`app ${dark ? "dark" : "light"}`}>
@@ -735,7 +843,7 @@ export default function Home() {
         </button>
       </header>
 
-      {/* Screen with Smooth Live Sync */}
+      {/* Screen */}
       <section className="calculator-screen">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
           <div style={{ display: "flex", gap: "6px" }}>
@@ -767,7 +875,14 @@ export default function Home() {
             </button>
           </div>
 
-          <small style={{ color: "#71717a", fontSize: "10px" }}>Tap text to edit</small>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {scientific && (
+              <span style={{ fontSize: "11px", color: "#3b82f6", fontWeight: "bold" }}>
+                {isRad ? "RAD" : "DEG"}
+              </span>
+            )}
+            <small style={{ color: "#71717a", fontSize: "10px" }}>Tap text to edit</small>
+          </div>
         </div>
 
         {/* Chhota Expression Input */}
@@ -799,7 +914,7 @@ export default function Home() {
           }}
         />
 
-        {/* Bada Live Result Number (Typing ke sath automatic badhega) */}
+        {/* Bada Live Result Number */}
         <div className="result">{display}</div>
       </section>
 
@@ -826,17 +941,72 @@ export default function Home() {
         </button>
       </div>
 
+      {/* Scientific Advanced Panel */}
       {scientific && (
-        <section className="scientific-panel">
-          {scientificKeys.map((key) => (
-            <button
-              key={key}
-              className="scientific-key"
-              onClick={() => press(key)}
-            >
-              {key}
-            </button>
-          ))}
+        <section
+          className="scientific-panel"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gap: "8px",
+            marginBottom: "12px",
+          }}
+        >
+          {/* Row 1: DEG/RAD toggle & 2nd mode */}
+          <button
+            className="scientific-key"
+            onClick={() => {
+              playKeySound();
+              setIsRad(!isRad);
+            }}
+            style={{ fontWeight: "bold", color: "#38bdf8" }}
+          >
+            {isRad ? "RAD" : "DEG"}
+          </button>
+
+          <button
+            className="scientific-key"
+            onClick={() => {
+              playKeySound();
+              setIsSecond(!isSecond);
+            }}
+            style={{ color: isSecond ? "#38bdf8" : "inherit" }}
+          >
+            2nd
+          </button>
+
+          <button className="scientific-key" onClick={() => press("(")}>(</button>
+          <button className="scientific-key" onClick={() => press(")")}>)</button>
+          <button className="scientific-key" onClick={() => press("n!")}>n!</button>
+
+          {/* Row 2: Trig functions */}
+          <button
+            className="scientific-key"
+            onClick={() => press(isSecond ? "sin⁻¹" : "sin")}
+          >
+            {isSecond ? "sin⁻¹" : "sin"}
+          </button>
+          <button
+            className="scientific-key"
+            onClick={() => press(isSecond ? "cos⁻¹" : "cos")}
+          >
+            {isSecond ? "cos⁻¹" : "cos"}
+          </button>
+          <button
+            className="scientific-key"
+            onClick={() => press(isSecond ? "tan⁻¹" : "tan")}
+          >
+            {isSecond ? "tan⁻¹" : "tan"}
+          </button>
+          <button className="scientific-key" onClick={() => press("π")}>π</button>
+          <button className="scientific-key" onClick={() => press("e")}>e</button>
+
+          {/* Row 3: Powers & Logs */}
+          <button className="scientific-key" onClick={() => press("√")}>√</button>
+          <button className="scientific-key" onClick={() => press("x²")}>x²</button>
+          <button className="scientific-key" onClick={() => press("xʸ")}>xʸ</button>
+          <button className="scientific-key" onClick={() => press("log")}>log</button>
+          <button className="scientific-key" onClick={() => press("ln")}>ln</button>
         </section>
       )}
 
@@ -1345,6 +1515,7 @@ export default function Home() {
             />
           </div>
 
+          {/* Real File Thumbnails */}
           {vaultFiles.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 20px", color: "#71717a" }}>
               <div style={{ fontSize: "40px", marginBottom: "10px" }}>📁</div>
