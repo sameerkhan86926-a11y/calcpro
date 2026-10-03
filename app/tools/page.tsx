@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 
 const tools = [
@@ -56,8 +57,10 @@ const tools = [
 ];
 
 export default function ToolsPage() {
+  const [dark, setDark] = useState(true);
+
   return (
-    <main className="app dark tools-page">
+    <main className={`app ${dark ? "dark" : "light"} tools-page`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
@@ -102,24 +105,27 @@ export default function ToolsPage() {
 
       <nav className="bottom-nav">
         <Link href="/" className="nav-item">
-          <span>Calculator</span>
-          <small>Home</small>
+          <span>⌕</span>
+          <small>Calculator</small>
         </Link>
 
         <Link href="/tools/" className="nav-item active">
-          <span>Tools</span>
-          <small>Calculators</small>
+          <span>+</span>
+          <small>Tools</small>
         </Link>
 
-        <Link href="/" className="nav-item">
-          <span>History</span>
-          <small>Recent</small>
+        <Link href="/#history" className="nav-item">
+          <span>≡</span>
+          <small>History</small>
         </Link>
 
-        <Link href="/" className="nav-item">
-          <span>Settings</span>
-          <small>App</small>
-        </Link>
+        <button
+          className="nav-item"
+          onClick={() => setDark((value) => !value)}
+        >
+          <span>{dark ? "☼" : "☾"}</span>
+          <small>{dark ? "Light" : "Dark"}</small>
+        </button>
       </nav>
     </main>
   );
