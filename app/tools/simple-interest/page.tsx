@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function SimpleInterestPage() {
+  const [dark, setDark] = useState(true);
   const [principal, setPrincipal] = useState("100000");
   const [rate, setRate] = useState("10");
   const [years, setYears] = useState("5");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) setDark(savedTheme === "dark");
+  }, []);
 
   const p = Number(principal) || 0;
   const r = Number(rate) || 0;
@@ -21,7 +27,7 @@ export default function SimpleInterestPage() {
     });
 
   return (
-    <main className="app dark emi-page">
+    <main className={`app ${dark ? "dark" : "light"} emi-page`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
@@ -51,17 +57,20 @@ export default function SimpleInterestPage() {
               type="number"
               value={principal}
               onChange={(e) => setPrincipal(e.target.value)}
+              min="0"
             />
           </div>
         </label>
 
         <label>
-          <span>Rate</span>
+          <span>Rate (Annual)</span>
           <div className="input-box">
             <input
               type="number"
               value={rate}
               onChange={(e) => setRate(e.target.value)}
+              min="0"
+              step="0.1"
             />
             <span>%</span>
           </div>
@@ -74,6 +83,8 @@ export default function SimpleInterestPage() {
               type="number"
               value={years}
               onChange={(e) => setYears(e.target.value)}
+              min="0"
+              step="0.5"
             />
             <span>Years</span>
           </div>
@@ -106,11 +117,11 @@ export default function SimpleInterestPage() {
           <span>+</span>
           <small>Tools</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/#history" className="nav-item">
           <span>≡</span>
           <small>History</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/settings/" className="nav-item">
           <span>⚙</span>
           <small>Settings</small>
         </Link>
