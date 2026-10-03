@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-// Jo APK phone me chal raha hai, uska version yahan set hota hai
-const CURRENT_APP_VERSION = "1.0.1"; 
+// Jo purana APK installed hai uska version (nayi build banate waqt isse compare hoga)
+const CURRENT_APP_VERSION = "1.0.0"; 
 
-// Aapka live GitHub Pages version URL
-const LIVE_VERSION_URL = "https://sameerkhan86926-a11y.github.io/calcpro/version.json";
+// Raw GitHub link (0 second cache delay, 100% reliable)
+const LIVE_VERSION_URL =
+  "https://raw.githubusercontent.com/sameerkhan86926-a11y/calcpro/main/public/version.json";
 
 type VersionInfo = {
   version: string;
@@ -20,17 +21,20 @@ export default function UpdateChecker() {
   useEffect(() => {
     const checkForUpdates = async () => {
       try {
-        // ?t= lagane se phone purani cached file nahi lega, hamesha fresh data uthayega
         const res = await fetch(`${LIVE_VERSION_URL}?t=${Date.now()}`, {
           cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
         });
 
         if (!res.ok) return;
 
         const data: VersionInfo = await res.json();
 
-        // Agar server ka version current version se alag hai toh update popup dikhao
-        if (data.version && data.version !== CURRENT_APP_VERSION) {
+        // Version check logic
+        if (data.version && data.version.trim() !== CURRENT_APP_VERSION.trim()) {
           setUpdateAvailable(data);
         }
       } catch (err) {
@@ -47,15 +51,15 @@ export default function UpdateChecker() {
     <div
       style={{
         position: "fixed",
-        top: "16px",
+        top: "max(14px, env(safe-area-inset-top))",
         left: "50%",
         transform: "translateX(-50%)",
         width: "min(400px, calc(100% - 32px))",
-        background: "#1e1b4b",
-        border: "1px solid #38bdf8",
+        background: "#0f172a",
+        border: "1.5px solid #38bdf8",
         borderRadius: "14px",
         padding: "14px 16px",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.8)",
         zIndex: 99999,
         display: "flex",
         flexDirection: "column",
@@ -70,34 +74,39 @@ export default function UpdateChecker() {
         <button
           onClick={() => setUpdateAvailable(null)}
           style={{
-            background: "transparent",
+            background: "rgba(255,255,255,0.08)",
             border: "none",
             color: "#a1a1aa",
-            fontSize: "16px",
+            width: "24px",
+            height: "24px",
+            borderRadius: "50%",
+            fontSize: "14px",
             cursor: "pointer",
+            display: "grid",
+            placeItems: "center",
           }}
         >
           ✕
         </button>
       </div>
 
-      <p style={{ fontSize: "12px", color: "#cbd5e1", margin: 0 }}>
+      <p style={{ fontSize: "12px", color: "#cbd5e1", margin: 0, lineHeight: 1.4 }}>
         {updateAvailable.whatsNew || "A new version with performance improvements is ready."}
       </p>
 
       <a
         href={updateAvailable.downloadUrl}
-        target="_blank"
+        target="_system"
         rel="noopener noreferrer"
         style={{
           marginTop: "4px",
-          background: "#2563eb",
+          background: "linear-gradient(135deg, #0284c7, #2563eb)",
           color: "#ffffff",
           textAlign: "center",
-          padding: "8px 12px",
+          padding: "9px 14px",
           borderRadius: "8px",
           textDecoration: "none",
-          fontSize: "12px",
+          fontSize: "13px",
           fontWeight: "600",
         }}
       >
