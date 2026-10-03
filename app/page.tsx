@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 
 type HistoryItem = {
@@ -14,152 +14,227 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [scientific, setScientific] = useState(false);
   const [dark, setDark] = useState(true);
+  const [locale, setLocale] = useState("en-IN");
+  const [isCalculated, setIsCalculated] = useState(false);
 
+  // Settings & History Load
   useEffect(() => {
-    const saved = localStorage.getItem("calcpro-history");
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) setDark(savedTheme === "dark");
 
-    if (saved) {
+    const savedFormat = localStorage.getItem("calcpro-format");
+    if (savedFormat) setLocale(savedFormat);
+
+    const savedHistory = localStorage.getItem("calcpro-history");
+    if (savedHistory) {
       try {
-        setHistory(JSON.parse(saved));
+        setHistory(JSON.parse(savedHistory));
       } catch {
         setHistory([]);
       }
     }
   }, []);
 
+  // Sync History
   useEffect(() => {
     localStorage.setItem("calcpro-history", JSON.stringify(history));
   }, [history]);
 
-  const formatNumber = (value: number) => {
-    if (!Number.isFinite(value)) return "Error";
-
-    return Number(value.toFixed(10)).toLocaleString("en-IN", {
-      maximumFractionDigits: 10,
-    });
+  const triggerHaptic = () => {
+    if (typeof window !== "undefined" && "vibrate" in navigator) {
+      const vibe = localStorage.getItem("calcpro-vibration");
+      if (vibe !== "false") {
+        navigator.vibrate(15);
+      }
+    }
   };
 
-  const calculate = () => {
+  const toggleTheme = () => {
+    const nextDark = !dark;
+    setDark(nextDark);
+    localStorage.setItem("calcpro-theme", nextDark ? "dark" : "light");
+  };
+
+  const formatNumber = useCallback(
+    (value: number) => {
+      if (!Number.isFinite(value)) return "Error";
+      return Number(value.toFixed(10)).toLocaleString(locale, {
+        maximumFractionDigits: 10,
+      });
+    },
+    [locale]
+  );
+
+  // Accurate Percentage & Safe Math Engine
+  const evaluateExpression = (expr: string): number => {
+    let sanitized = expr.replace(/,/g, "").trim();
+
+    // Clean trailing operators
+    sanitized = sanitized.replace(/[+\-*/%]+$/, "");
+    if (!sanitized) return 0;
+
+    // Handle percentage logic like 200 + 10% => 200 + (200 * 0.1)
+    sanitized = sanitized.replace(
+      /(\d+(?:\.\d+)?)\s*([+\-])\s*(\d+(?:\.\d+)?)%/g,
+      "($1 $2 ($1 * $3 / 100))"
+    );
+    // Simple percentage like 50 * 10% => 50 * (10 / 100)
+    sanitized = sanitized.replace(/(\d+(?:\.\d+)?)%/g, "($1 / 100)");
+
+    if (!/^[0-9+\-*/().\s]+$/.test(sanitized)) {
+      throw new Error("Invalid Syntax");
+    }
+
+    const res = Function(`"use strict"; return (${sanitized})`)();
+    return Number(res);
+  };
+
+  const calculate = useCallback(() => {
     if (!expression) return;
 
     try {
-      const safeExpression = expression.replace(/,/g, "");
-
-      if (!/^[0-9+\-*/().%\s]+$/.test(safeExpression)) {
-        throw new Error("Invalid");
-      }
-
-      const result = Function(
-        `"use strict"; return (${safeExpression})`
-      )();
-
-      const formatted = formatNumber(Number(result));
+      const rawResult = evaluateExpression(expression);
+      const formatted = formatNumber(rawResult);
 
       setDisplay(formatted);
-      setHistory((prev) => [
-        {
-          expression,
-          result: formatted,
-        },
-        ...prev,
-      ].slice(0, 30));
+      setHistory((prev) =>
+        [
+          {
+            expression,
+            result: formatted,
+          },
+          ...prev,
+        ].slice(0, 30)
+      );
 
-      setExpression(String(result));
+      setExpression(String(rawResult));
+      setIsCalculated(true);
     } catch {
       setDisplay("Error");
+      setIsCalculated(true);
     }
-  };
+  }, [expression, formatNumber]);
 
-  const press = (key: string) => {
-    if (key === "AC") {
-      setExpression("");
-      setDisplay("0");
-      return;
-    }
+  const press = useCallback(
+    (key: string) => {
+      triggerHaptic();
 
-    if (key === "DEL") {
-      const next = expression.slice(0, -1);
-      setExpression(next);
-      setDisplay(next || "0");
-      return;
-    }
-
-    if (key === "=") {
-      calculate();
-      return;
-    }
-
-    if (key === "√") {
-      const value = Number(expression || display.replace(/,/g, ""));
-
-      if (!Number.isNaN(value)) {
-        const result = Math.sqrt(value);
-        setExpression(String(result));
-        setDisplay(formatNumber(result));
+      if (key === "AC") {
+        setExpression("");
+        setDisplay("0");
+        setIsCalculated(false);
+        return;
       }
 
-      return;
-    }
-
-    if (key === "x²") {
-      const value = Number(expression || display.replace(/,/g, ""));
-
-      if (!Number.isNaN(value)) {
-        const result = value ** 2;
-        setExpression(String(result));
-        setDisplay(formatNumber(result));
+      if (key === "DEL") {
+        if (isCalculated) {
+          setExpression("");
+          setDisplay("0");
+          setIsCalculated(false);
+          return;
+        }
+        const next = expression.slice(0, -1);
+        setExpression(next);
+        setDisplay(next || "0");
+        return;
       }
 
-      return;
-    }
+      if (key === "=") {
+        calculate();
+        return;
+      }
 
-    if (key === "π") {
-      setExpression((prev) => prev + Math.PI);
-      setDisplay((prev) => (prev === "0" ? "π" : prev + "π"));
-      return;
-    }
+      // Quick Scientific Functions
+      if (key === "√") {
+        const value = Number(expression || display.replace(/,/g, ""));
+        if (!Number.isNaN(value) && value >= 0) {
+          const result = Math.sqrt(value);
+          setExpression(String(result));
+          setDisplay(formatNumber(result));
+          setIsCalculated(true);
+        } else {
+          setDisplay("Error");
+        }
+        return;
+      }
 
-    if (key === "sin" || key === "cos" || key === "tan") {
-      const value = Number(expression || display.replace(/,/g, ""));
+      if (key === "x²") {
+        const value = Number(expression || display.replace(/,/g, ""));
+        if (!Number.isNaN(value)) {
+          const result = value ** 2;
+          setExpression(String(result));
+          setDisplay(formatNumber(result));
+          setIsCalculated(true);
+        }
+        return;
+      }
 
-      if (!Number.isNaN(value)) {
-        const radians = (value * Math.PI) / 180;
+      if (key === "π") {
+        const val = String(Math.PI);
+        if (isCalculated || !expression) {
+          setExpression(val);
+          setDisplay("π");
+        } else {
+          setExpression((prev) => prev + val);
+          setDisplay((prev) => (prev === "0" ? "π" : prev + "π"));
+        }
+        setIsCalculated(false);
+        return;
+      }
 
-        const result =
-          key === "sin"
-            ? Math.sin(radians)
-            : key === "cos"
+      if (key === "sin" || key === "cos" || key === "tan") {
+        const value = Number(expression || display.replace(/,/g, ""));
+        if (!Number.isNaN(value)) {
+          const radians = (value * Math.PI) / 180;
+          const result =
+            key === "sin"
+              ? Math.sin(radians)
+              : key === "cos"
               ? Math.cos(radians)
               : Math.tan(radians);
 
-        setExpression(String(result));
-        setDisplay(formatNumber(result));
+          setExpression(String(result));
+          setDisplay(formatNumber(result));
+          setIsCalculated(true);
+        }
+        return;
       }
 
-      return;
-    }
+      // Operators
+      const operators = ["+", "-", "*", "/", "%"];
+      if (operators.includes(key)) {
+        setIsCalculated(false);
+        if (!expression && key !== "-") return;
 
-    const operators = ["+", "-", "*", "/", "%"];
-
-    if (operators.includes(key)) {
-      if (!expression && key !== "-") return;
-
-      const last = expression.slice(-1);
-
-      if (operators.includes(last)) {
-        setExpression(expression.slice(0, -1) + key);
-      } else {
-        setExpression(expression + key);
+        const last = expression.slice(-1);
+        if (operators.includes(last)) {
+          setExpression(expression.slice(0, -1) + key);
+        } else {
+          setExpression(expression + key);
+        }
+        return;
       }
 
-      return;
-    }
+      // Decimal (.) Prevention for multiples in same segment
+      if (key === ".") {
+        const currentSegment = expression.split(/[+\-*/%]/).pop() || "";
+        if (currentSegment.includes(".")) return;
+      }
 
-    const next = expression + key;
+      // Continuous Calculation handling: naye digit par fresh start
+      if (isCalculated) {
+        setIsCalculated(false);
+        setExpression(key);
+        setDisplay(key);
+        return;
+      }
 
-    setExpression(next);
-    setDisplay(next);
-  };
+      const next = expression + key;
+      setExpression(next);
+      setDisplay(next);
+    },
+    [expression, display, isCalculated, calculate, formatNumber]
+  );
 
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
@@ -179,11 +254,10 @@ export default function Home() {
     };
 
     window.addEventListener("keydown", handleKeyboard);
-
     return () => {
       window.removeEventListener("keydown", handleKeyboard);
     };
-  });
+  }, [press]);
 
   const basicKeys = [
     "AC",
@@ -207,21 +281,13 @@ export default function Home() {
     "=",
   ];
 
-  const scientificKeys = [
-    "sin",
-    "cos",
-    "tan",
-    "√",
-    "x²",
-    "π",
-  ];
+  const scientificKeys = ["sin", "cos", "tan", "√", "x²", "π"];
 
   return (
     <main className={`app ${dark ? "dark" : "light"}`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
-
           <div>
             <h1>CalcPro</h1>
             <p>Smart Calculator</p>
@@ -230,7 +296,7 @@ export default function Home() {
 
         <button
           className="icon-button"
-          onClick={() => setDark((value) => !value)}
+          onClick={toggleTheme}
           aria-label="Toggle theme"
         >
           {dark ? "☼" : "☾"}
@@ -238,13 +304,8 @@ export default function Home() {
       </header>
 
       <section className="calculator-screen">
-        <div className="expression">
-          {expression || "0"}
-        </div>
-
-        <div className="result">
-          {display}
-        </div>
+        <div className="expression">{expression || "0"}</div>
+        <div className="result">{display}</div>
       </section>
 
       <div className="mode-row">
@@ -293,7 +354,9 @@ export default function Home() {
                 isDanger ? "danger" : "",
                 isUtility ? "utility" : "",
                 isEqual ? "equals" : "",
-              ].join(" ")}
+              ]
+                .filter(Boolean)
+                .join(" ")}
               onClick={() => press(key)}
             >
               {key === "*" ? "×" : key === "/" ? "÷" : key}
@@ -325,7 +388,10 @@ export default function Home() {
           {history.length > 0 && (
             <button
               className="clear-history"
-              onClick={() => setHistory([])}
+              onClick={() => {
+                setHistory([]);
+                localStorage.removeItem("calcpro-history");
+              }}
             >
               Clear
             </button>
@@ -347,6 +413,7 @@ export default function Home() {
                 onClick={() => {
                   setExpression(item.result.replace(/,/g, ""));
                   setDisplay(item.result);
+                  setIsCalculated(true);
                 }}
               >
                 <span>{item.expression}</span>
@@ -373,13 +440,10 @@ export default function Home() {
           <small>History</small>
         </a>
 
-        <button
-          className="nav-item"
-          onClick={() => setDark((value) => !value)}
-        >
-          <span>{dark ? "☼" : "☾"}</span>
-          <small>{dark ? "Light" : "Dark"}</small>
-        </button>
+        <Link href="/settings/" className="nav-item">
+          <span>⚙</span>
+          <small>Settings</small>
+        </Link>
       </nav>
     </main>
   );
