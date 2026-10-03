@@ -827,7 +827,7 @@ export default function Home() {
           style={{ userSelect: "none", cursor: "pointer" }}
           title="Long-press for secret vault"
         >
-          <div className="brand-icon">C</div>
+          <div className="brand-icon"></div>
           <div>
             <h1>CalcPro</h1>
             <p>Smart Calculator</p>
