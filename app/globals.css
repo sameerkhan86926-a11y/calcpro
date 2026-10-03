@@ -59,13 +59,9 @@ button {
   width: 42px;
   height: 42px;
   border-radius: 13px;
-  display: grid;
-  place-items: center;
-  background: #ffffff;
-  color: #111111;
-  font-size: 20px;
-  font-weight: 800;
+  background: url('/logo.svg') center/contain no-repeat;
 }
+
 
 .brand h1 {
   font-size: 20px;
