@@ -225,8 +225,8 @@ export default function Home() {
   const [display, setDisplay] = useState("0");
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [scientific, setScientific] = useState(false);
-  const [isRad, setIsRad] = useState(false); // DEG vs RAD toggle
-  const [isSecond, setIsSecond] = useState(false); // 2nd function toggle (sin vs sin⁻¹)
+  const [isRad, setIsRad] = useState(false);
+  const [isSecond, setIsSecond] = useState(false);
   const [dark, setDark] = useState(true);
   const [locale, setLocale] = useState("en-IN");
   const [isCalculated, setIsCalculated] = useState(false);
@@ -325,10 +325,8 @@ export default function Home() {
     sanitized = sanitized.replace(/[+\-*/%^]+$/, "");
     if (!sanitized) return 0;
 
-    // Power operator replace (^ -> **)
     sanitized = sanitized.replace(/\^/g, "**");
 
-    // Percentage substitutions
     sanitized = sanitized.replace(
       /(\d+(?:\.\d+)?)\s*([+\-])\s*(\d+(?:\.\d+)?)%/g,
       "($1 $2 ($1 * $3 / 100))"
@@ -343,7 +341,6 @@ export default function Home() {
     return Number(res);
   }, []);
 
-  // REAL-TIME LIVE CALCULATION
   useEffect(() => {
     if (!expression) {
       if (!isCalculated) setDisplay("0");
@@ -500,20 +497,18 @@ export default function Home() {
     }
   }, [expression, vaultPasscode, evaluateExpression, formatNumber]);
 
+  // Virtual keyboard block: focus nahi lagayenge, sirf cursor selection point set hoga
   const updateInputCursor = (newPos: number) => {
     setCursorPos(newPos);
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.setSelectionRange(newPos, newPos);
-        inputRef.current.focus();
-      }
-    }, 0);
+    if (inputRef.current) {
+      inputRef.current.setSelectionRange(newPos, newPos);
+    }
   };
 
   const moveCursor = (direction: "left" | "right") => {
     triggerHaptic();
     playKeySound();
-    const current = inputRef.current ? inputRef.current.selectionStart ?? cursorPos : cursorPos;
+    const current = cursorPos;
     const newPos = direction === "left" ? Math.max(0, current - 1) : Math.min(expression.length, current + 1);
     updateInputCursor(newPos);
   };
@@ -574,7 +569,7 @@ export default function Home() {
       triggerHaptic();
       playKeySound();
 
-      const currentPos = inputRef.current ? inputRef.current.selectionStart ?? cursorPos : cursorPos;
+      const currentPos = cursorPos;
 
       if (key === "AC") {
         setExpression("");
@@ -607,7 +602,6 @@ export default function Home() {
         return;
       }
 
-      // Constant: π
       if (key === "π") {
         const val = String(Math.PI);
         if (isCalculated || !expression) {
@@ -622,7 +616,6 @@ export default function Home() {
         return;
       }
 
-      // Constant: e
       if (key === "e") {
         const val = String(Math.E);
         if (isCalculated || !expression) {
@@ -637,7 +630,6 @@ export default function Home() {
         return;
       }
 
-      // Immediate Unary Scientific Functions
       const currentNum = Number(expression || display.replace(/,/g, ""));
 
       if (key === "√") {
@@ -710,7 +702,6 @@ export default function Home() {
         return;
       }
 
-      // Trigonometry (Standard & Inverse with DEG/RAD Support)
       if (["sin", "cos", "tan", "sin⁻¹", "cos⁻¹", "tan⁻¹"].includes(key)) {
         if (!Number.isNaN(currentNum)) {
           let result = 0;
@@ -724,7 +715,6 @@ export default function Home() {
                 ? Math.cos(angleInRad)
                 : Math.tan(angleInRad);
           } else {
-            // Inverse functions
             let radVal = 0;
             if (key === "sin⁻¹") radVal = Math.asin(currentNum);
             else if (key === "cos⁻¹") radVal = Math.acos(currentNum);
@@ -746,7 +736,6 @@ export default function Home() {
         return;
       }
 
-      // Power / Exponent Operator (xʸ -> ^)
       if (key === "xʸ") {
         if (!expression) return;
         setIsCalculated(false);
@@ -756,7 +745,6 @@ export default function Home() {
         return;
       }
 
-      // Parentheses `(` and `)`
       if (key === "(" || key === ")") {
         setIsCalculated(false);
         const next = expression.slice(0, currentPos) + key + expression.slice(currentPos);
@@ -765,7 +753,6 @@ export default function Home() {
         return;
       }
 
-      // Standard Operators
       const operators = ["+", "-", "*", "/", "%", "^"];
       if (operators.includes(key)) {
         setIsCalculated(false);
@@ -837,6 +824,7 @@ export default function Home() {
         <button
           className="icon-button"
           onClick={toggleTheme}
+          onMouseDown={(e) => e.preventDefault()}
           aria-label="Toggle theme"
         >
           {dark ? "☼" : "☾"}
@@ -849,6 +837,7 @@ export default function Home() {
           <div style={{ display: "flex", gap: "6px" }}>
             <button
               onClick={() => moveCursor("left")}
+              onMouseDown={(e) => e.preventDefault()}
               aria-label="Move cursor left"
               style={{
                 background: "rgba(255,255,255,0.08)",
@@ -862,6 +851,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => moveCursor("right")}
+              onMouseDown={(e) => e.preventDefault()}
               aria-label="Move cursor right"
               style={{
                 background: "rgba(255,255,255,0.08)",
@@ -881,25 +871,19 @@ export default function Home() {
                 {isRad ? "RAD" : "DEG"}
               </span>
             )}
-            <small style={{ color: "#71717a", fontSize: "10px" }}>Tap text to edit</small>
+            <small style={{ color: "#71717a", fontSize: "10px" }}>Smart Screen</small>
           </div>
         </div>
 
-        {/* Chhota Expression Input */}
+        {/* Chhota Expression Input - Keyboard completely locked */}
         <input
           ref={inputRef}
           type="text"
+          readOnly
+          inputMode="none"
+          tabIndex={-1}
+          autoComplete="off"
           value={expression}
-          onChange={(e) => {
-            const val = e.target.value;
-            setExpression(val);
-            setIsCalculated(false);
-            setCursorPos(e.target.selectionStart ?? val.length);
-          }}
-          onSelect={(e) => {
-            const target = e.target as HTMLInputElement;
-            setCursorPos(target.selectionStart ?? expression.length);
-          }}
           placeholder="0"
           className="expression"
           style={{
@@ -909,8 +893,9 @@ export default function Home() {
             textAlign: "right",
             width: "100%",
             color: "inherit",
-            cursor: "text",
+            cursor: "default",
             overflowX: "auto",
+            userSelect: "none",
           }}
         />
 
@@ -922,6 +907,7 @@ export default function Home() {
       <div className="mode-row">
         <button
           className={!scientific ? "mode active" : "mode"}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             playKeySound();
             setScientific(false);
@@ -932,6 +918,7 @@ export default function Home() {
 
         <button
           className={scientific ? "mode active" : "mode"}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             playKeySound();
             setScientific(true);
@@ -952,9 +939,9 @@ export default function Home() {
             marginBottom: "12px",
           }}
         >
-          {/* Row 1: DEG/RAD toggle & 2nd mode */}
           <button
             className="scientific-key"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               playKeySound();
               setIsRad(!isRad);
@@ -966,6 +953,7 @@ export default function Home() {
 
           <button
             className="scientific-key"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               playKeySound();
               setIsSecond(!isSecond);
@@ -975,38 +963,39 @@ export default function Home() {
             2nd
           </button>
 
-          <button className="scientific-key" onClick={() => press("(")}>(</button>
-          <button className="scientific-key" onClick={() => press(")")}>)</button>
-          <button className="scientific-key" onClick={() => press("n!")}>n!</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("(")}>(</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press(")")}>)</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("n!")}>n!</button>
 
-          {/* Row 2: Trig functions */}
           <button
             className="scientific-key"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => press(isSecond ? "sin⁻¹" : "sin")}
           >
             {isSecond ? "sin⁻¹" : "sin"}
           </button>
           <button
             className="scientific-key"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => press(isSecond ? "cos⁻¹" : "cos")}
           >
             {isSecond ? "cos⁻¹" : "cos"}
           </button>
           <button
             className="scientific-key"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => press(isSecond ? "tan⁻¹" : "tan")}
           >
             {isSecond ? "tan⁻¹" : "tan"}
           </button>
-          <button className="scientific-key" onClick={() => press("π")}>π</button>
-          <button className="scientific-key" onClick={() => press("e")}>e</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("π")}>π</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("e")}>e</button>
 
-          {/* Row 3: Powers & Logs */}
-          <button className="scientific-key" onClick={() => press("√")}>√</button>
-          <button className="scientific-key" onClick={() => press("x²")}>x²</button>
-          <button className="scientific-key" onClick={() => press("xʸ")}>xʸ</button>
-          <button className="scientific-key" onClick={() => press("log")}>log</button>
-          <button className="scientific-key" onClick={() => press("ln")}>ln</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("√")}>√</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("x²")}>x²</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("xʸ")}>xʸ</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("log")}>log</button>
+          <button className="scientific-key" onMouseDown={(e) => e.preventDefault()} onClick={() => press("ln")}>ln</button>
         </section>
       )}
 
@@ -1021,6 +1010,7 @@ export default function Home() {
           return (
             <button
               key={key}
+              onMouseDown={(e) => e.preventDefault()}
               className={[
                 "key",
                 isOperator ? "operator" : "",
@@ -1070,6 +1060,7 @@ export default function Home() {
           {history.length > 0 && (
             <button
               className="clear-history"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 setHistory([]);
                 localStorage.removeItem("calcpro-history");
@@ -1223,6 +1214,7 @@ export default function Home() {
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={8}
                 placeholder="Enter 4-8 Digit PIN"
                 value={newPin}
@@ -1241,6 +1233,7 @@ export default function Home() {
 
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={8}
                 placeholder="Confirm PIN"
                 value={confirmPin}
@@ -1380,6 +1373,7 @@ export default function Home() {
 
               <input
                 type="password"
+                inputMode="numeric"
                 maxLength={8}
                 placeholder="Enter New 4-8 Digit PIN"
                 value={resetNewPin}
