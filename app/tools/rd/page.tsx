@@ -1,28 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function RDPage() {
+  const [dark, setDark] = useState(true);
   const [monthly, setMonthly] = useState("5000");
   const [rate, setRate] = useState("7");
   const [years, setYears] = useState("5");
 
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) setDark(savedTheme === "dark");
+  }, []);
+
   const p = Number(monthly) || 0;
   const r = Number(rate) || 0;
-  const n = (Number(years) || 0) * 4;
+  const yr = Number(years) || 0;
+  const quarters = yr * 4;
 
   const quarterlyRate = r / 400;
 
+  // Standard Indian Banking RD formula (Quarterly Compounding on monthly deposits)
   const maturity =
-    quarterlyRate === 0
-      ? p * n
+    p <= 0 || yr <= 0
+      ? 0
+      : quarterlyRate === 0
+      ? p * yr * 12
       : p *
-        ((Math.pow(1 + quarterlyRate, n) - 1) /
+        ((Math.pow(1 + quarterlyRate, quarters) - 1) /
           (1 - Math.pow(1 + quarterlyRate, -1 / 3)));
 
-  const invested = p * (Number(years) || 0) * 12;
-  const interest = maturity - invested;
+  const invested = p * yr * 12;
+  const interest = maturity > invested ? maturity - invested : 0;
 
   const money = (x: number) =>
     x.toLocaleString("en-IN", {
@@ -30,7 +40,7 @@ export default function RDPage() {
     });
 
   return (
-    <main className="app dark emi-page">
+    <main className={`app ${dark ? "dark" : "light"} emi-page`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
@@ -60,6 +70,7 @@ export default function RDPage() {
               type="number"
               value={monthly}
               onChange={(e) => setMonthly(e.target.value)}
+              min="0"
             />
           </div>
         </label>
@@ -71,6 +82,8 @@ export default function RDPage() {
               type="number"
               value={rate}
               onChange={(e) => setRate(e.target.value)}
+              min="0"
+              step="0.1"
             />
             <span>%</span>
           </div>
@@ -83,6 +96,8 @@ export default function RDPage() {
               type="number"
               value={years}
               onChange={(e) => setYears(e.target.value)}
+              min="0"
+              step="0.5"
             />
             <span>Years</span>
           </div>
@@ -115,11 +130,11 @@ export default function RDPage() {
           <span>+</span>
           <small>Tools</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/#history" className="nav-item">
           <span>≡</span>
           <small>History</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/settings/" className="nav-item">
           <span>⚙</span>
           <small>Settings</small>
         </Link>
