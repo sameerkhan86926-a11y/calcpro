@@ -497,7 +497,6 @@ export default function Home() {
     }
   }, [expression, vaultPasscode, evaluateExpression, formatNumber]);
 
-  // Virtual keyboard block: focus nahi lagayenge, sirf cursor selection point set hoga
   const updateInputCursor = (newPos: number) => {
     setCursorPos(newPos);
     if (inputRef.current) {
@@ -871,11 +870,11 @@ export default function Home() {
                 {isRad ? "RAD" : "DEG"}
               </span>
             )}
-            <small style={{ color: "#71717a", fontSize: "10px" }}>Smart Screen</small>
+            <small style={{ color: "#71717a", fontSize: "10px" }}>Tap text to position cursor</small>
           </div>
         </div>
 
-        {/* Chhota Expression Input - Keyboard completely locked */}
+        {/* Expression Input - Tap/Click se cursor position set hoga, keyboard nahi aayega */}
         <input
           ref={inputRef}
           type="text"
@@ -886,6 +885,16 @@ export default function Home() {
           value={expression}
           placeholder="0"
           className="expression"
+          onClick={(e) => {
+            const target = e.target as HTMLInputElement;
+            const pos = target.selectionStart ?? expression.length;
+            setCursorPos(pos);
+          }}
+          onSelect={(e) => {
+            const target = e.target as HTMLInputElement;
+            const pos = target.selectionStart ?? expression.length;
+            setCursorPos(pos);
+          }}
           style={{
             background: "transparent",
             border: "none",
@@ -893,9 +902,9 @@ export default function Home() {
             textAlign: "right",
             width: "100%",
             color: "inherit",
-            cursor: "default",
+            cursor: "text",
             overflowX: "auto",
-            userSelect: "none",
+            caretColor: "#38bdf8",
           }}
         />
 
