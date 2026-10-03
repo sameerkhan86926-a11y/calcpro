@@ -818,30 +818,40 @@ export default function Home() {
     <main className={`app ${dark ? "dark" : "light"}`}>
       {/* Header */}
       <header className="app-header">
-        <div
-          className="brand"
-          onMouseDown={handleLogoTouchStart}
-          onMouseUp={handleLogoTouchEnd}
-          onTouchStart={handleLogoTouchStart}
-          onTouchEnd={handleLogoTouchEnd}
-          style={{ userSelect: "none", cursor: "pointer" }}
-          title="Long-press for secret vault"
-        >
-          <div className="brand-icon">C</div>
-          <div>
-            <h1>CalcPro</h1>
-            <p>Smart Calculator</p>
-          </div>
-        </div>
+  <div
+    className="brand"
+    onMouseDown={handleLogoTouchStart}
+    onMouseUp={handleLogoTouchEnd}
+    onTouchStart={handleLogoTouchStart}
+    onTouchEnd={handleLogoTouchEnd}
+    style={{ userSelect: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "10px" }}
+    title="Long-press for secret vault"
+  >
+    <img
+      src="/logo.svg"
+      alt="CalcPro"
+      style={{
+        width: "38px",
+        height: "38px",
+        borderRadius: "10px",
+        display: "block",
+      }}
+    />
+    <div>
+      <h1>CalcPro</h1>
+      <p>Smart Calculator</p>
+    </div>
+  </div>
 
-        <button
-          className="icon-button"
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-        >
-          {dark ? "☼" : "☾"}
-        </button>
-      </header>
+  <button
+    className="icon-button"
+    onClick={toggleTheme}
+    aria-label="Toggle theme"
+  >
+    {dark ? "☼" : "☾"}
+  </button>
+</header>
+
 
       {/* Screen */}
       <section className="calculator-screen">
