@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { numberToIndianWords } from "@/lib/numToWords";
 
 type HistoryItem = {
   expression: string;
@@ -237,6 +238,7 @@ export default function Home() {
   const [vaultFiles, setVaultFiles] = useState<VaultFile[]>([]);
   const [vaultPasscode, setVaultPasscode] = useState<string | null>(null);
   const [showVaultIntro, setShowVaultIntro] = useState(false);
+  const [hasBiometrics, setHasBiometrics] = useState(false);
 
   // PIN Setup States
   const [isSettingPin, setIsSettingPin] = useState(false);
@@ -284,6 +286,13 @@ export default function Home() {
     const introShown = localStorage.getItem("calcpro-vault-intro");
     if (!introShown) {
       setShowVaultIntro(true);
+    }
+
+    // Biometrics support check
+    if (typeof window !== "undefined" && window.PublicKeyCredential) {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        .then((available) => setHasBiometrics(available))
+        .catch(() => setHasBiometrics(false));
     }
 
     getFilesFromDB()
@@ -387,6 +396,29 @@ export default function Home() {
   const handleLogoTouchEnd = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
+    }
+  };
+
+  const handleBiometricUnlock = async () => {
+    try {
+      triggerHaptic();
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+
+      const credential = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: window.location.hostname,
+          userVerification: "required",
+          timeout: 60000,
+        },
+      });
+
+      if (credential) {
+        setVaultOpen(true);
+      }
+    } catch {
+      // Fallback to PIN
     }
   };
 
@@ -810,12 +842,31 @@ export default function Home() {
           onMouseUp={handleLogoTouchEnd}
           onTouchStart={handleLogoTouchStart}
           onTouchEnd={handleLogoTouchEnd}
-          style={{ userSelect: "none", cursor: "pointer" }}
+          style={{ userSelect: "none", cursor: "pointer", position: "relative" }}
           title="Long-press for secret vault"
         >
           <div className="brand-icon"></div>
           <div>
-            <h1>CalcPro</h1>
+            <h1 style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              CalcPro
+              {hasBiometrics && vaultPasscode && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBiometricUnlock();
+                  }}
+                  style={{
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    opacity: 0.65,
+                    padding: "2px",
+                  }}
+                  title="Unlock Vault with Biometrics"
+                >
+                  🔒
+                </span>
+              )}
+            </h1>
             <p>Smart Calculator</p>
           </div>
         </div>
@@ -910,6 +961,23 @@ export default function Home() {
 
         {/* Bada Live Result Number */}
         <div className="result">{display}</div>
+
+        {/* Real-time Indian Words representation */}
+        {display && display !== "0" && display !== "Error" && (
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#38bdf8",
+              marginTop: "4px",
+              opacity: 0.85,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {numberToIndianWords(Number(display.replace(/,/g, "")))}
+          </div>
+        )}
       </section>
 
       {/* Mode Bar */}
@@ -1047,10 +1115,10 @@ export default function Home() {
         </div>
 
         <div className="tool-grid">
+          <Link href="/tools/cash-counter/">Cash</Link>
           <Link href="/tools/emi/">EMI</Link>
           <Link href="/tools/gst/">GST</Link>
           <Link href="/tools/sip/">SIP</Link>
-          <Link href="/tools/simple-interest/">Interest</Link>
         </div>
       </section>
 
