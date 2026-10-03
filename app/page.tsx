@@ -99,11 +99,11 @@ const playKeySound = () => {
     osc.start();
     osc.stop(ctx.currentTime + 0.035);
   } catch {
-    // Audio unsupported fallback
+    // Audio fallback
   }
 };
 
-// ---------------- Real Thumbnail Renderer (No Emojis) ----------------
+// ---------------- Real Thumbnail Component ----------------
 function VaultThumbnail({
   file,
   onClick,
@@ -225,18 +225,16 @@ export default function Home() {
   const [vaultOpen, setVaultOpen] = useState(false);
   const [vaultFiles, setVaultFiles] = useState<VaultFile[]>([]);
   const [vaultPasscode, setVaultPasscode] = useState<string | null>(null);
-
-  // Onboarding Hint (First time user)
   const [showVaultIntro, setShowVaultIntro] = useState(false);
 
-  // First Time Setup States
+  // PIN Setup States
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [securityAnswer, setSecurityAnswer] = useState("");
   const [pinError, setPinError] = useState("");
 
-  // Recovery States (Emergency 11223344=)
+  // Recovery States
   const [isRecovering, setIsRecovering] = useState(false);
   const [recoveryInput, setRecoveryInput] = useState("");
   const [resetNewPin, setResetNewPin] = useState("");
@@ -272,7 +270,6 @@ export default function Home() {
       setVaultPasscode(null);
     }
 
-    // Check first-time intro guide
     const introShown = localStorage.getItem("calcpro-vault-intro");
     if (!introShown) {
       setShowVaultIntro(true);
@@ -312,7 +309,7 @@ export default function Home() {
     [locale]
   );
 
-  const evaluateExpression = (expr: string): number => {
+  const evaluateExpression = useCallback((expr: string): number => {
     let sanitized = expr.replace(/,/g, "").trim();
     sanitized = sanitized.replace(/[+\-*/%]+$/, "");
     if (!sanitized) return 0;
@@ -329,9 +326,43 @@ export default function Home() {
 
     const res = Function(`"use strict"; return (${sanitized})`)();
     return Number(res);
-  };
+  }, []);
 
-  // Secret Header Long-Press Trigger
+  // REAL-TIME LIVE CALCULATION: Bada number typing ke sath-sath calculate hokar badhega
+  useEffect(() => {
+    if (!expression) {
+      if (!isCalculated) setDisplay("0");
+      return;
+    }
+
+    if (isCalculated) return;
+
+    // Secret PIN ya Emergency Code match hone par live number calculate na kare
+    const cleanExpr = expression.trim();
+    if (cleanExpr === "11223344" || (vaultPasscode && cleanExpr === vaultPasscode)) {
+      return;
+    }
+
+    try {
+      const sanitized = cleanExpr.replace(/[+\-*/%]+$/, "");
+      if (!sanitized) return;
+
+      const liveVal = evaluateExpression(sanitized);
+      if (Number.isFinite(liveVal)) {
+        setDisplay(formatNumber(liveVal));
+      }
+    } catch {
+      // Incomplete syntax par display atka nahi rahega
+    }
+  }, [expression, isCalculated, vaultPasscode, evaluateExpression, formatNumber]);
+
+  // Expression overflow par automatic right scroll
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.scrollLeft = inputRef.current.scrollWidth;
+    }
+  }, [expression]);
+
   const handleLogoTouchStart = () => {
     longPressTimer.current = setTimeout(() => {
       triggerHaptic();
@@ -404,7 +435,6 @@ export default function Home() {
     if (!expression) return;
     const cleanExpr = expression.trim();
 
-    // 1. Emergency Master Rescue Code
     if (cleanExpr === "11223344") {
       triggerHaptic();
       setExpression("");
@@ -414,7 +444,6 @@ export default function Home() {
       return;
     }
 
-    // 2. Secret PIN match to open Vault
     if (vaultPasscode && cleanExpr === vaultPasscode) {
       triggerHaptic();
       setVaultOpen(true);
@@ -424,7 +453,6 @@ export default function Home() {
       return;
     }
 
-    // 3. First-time setup trigger if no PIN exists
     if (!vaultPasscode && cleanExpr === "1234") {
       triggerHaptic();
       setIsSettingPin(true);
@@ -457,7 +485,7 @@ export default function Home() {
       setDisplay("Error");
       setIsCalculated(true);
     }
-  }, [expression, vaultPasscode, formatNumber]);
+  }, [expression, vaultPasscode, evaluateExpression, formatNumber]);
 
   const updateInputCursor = (newPos: number) => {
     setCursorPos(newPos);
@@ -556,7 +584,7 @@ export default function Home() {
 
         const next = expression.slice(0, currentPos - 1) + expression.slice(currentPos);
         setExpression(next);
-        setDisplay(next || "0");
+        if (!next) setDisplay("0");
         updateInputCursor(currentPos - 1);
         return;
       }
@@ -598,12 +626,10 @@ export default function Home() {
         const val = String(Math.PI);
         if (isCalculated || !expression) {
           setExpression(val);
-          setDisplay("π");
           setCursorPos(val.length);
         } else {
           const next = expression.slice(0, currentPos) + val + expression.slice(currentPos);
           setExpression(next);
-          setDisplay(next);
           updateInputCursor(currentPos + val.length);
         }
         setIsCalculated(false);
@@ -639,12 +665,10 @@ export default function Home() {
         if (operators.includes(prevChar)) {
           const next = expression.slice(0, currentPos - 1) + key + expression.slice(currentPos);
           setExpression(next);
-          setDisplay(next);
           updateInputCursor(currentPos);
         } else {
           const next = expression.slice(0, currentPos) + key + expression.slice(currentPos);
           setExpression(next);
-          setDisplay(next);
           updateInputCursor(currentPos + key.length);
         }
         return;
@@ -661,14 +685,12 @@ export default function Home() {
       if (isCalculated) {
         setIsCalculated(false);
         setExpression(key);
-        setDisplay(key);
         setCursorPos(key.length);
         return;
       }
 
       const next = expression.slice(0, currentPos) + key + expression.slice(currentPos);
       setExpression(next);
-      setDisplay(next);
       updateInputCursor(currentPos + key.length);
     },
     [expression, display, cursorPos, isCalculated, calculate, formatNumber]
@@ -686,7 +708,7 @@ export default function Home() {
 
   return (
     <main className={`app ${dark ? "dark" : "light"}`}>
-      {/* Header with Long-Press Secret Gesture */}
+      {/* Header */}
       <header className="app-header">
         <div
           className="brand"
@@ -713,7 +735,7 @@ export default function Home() {
         </button>
       </header>
 
-      {/* Screen */}
+      {/* Screen with Smooth Live Sync */}
       <section className="calculator-screen">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
           <div style={{ display: "flex", gap: "6px" }}>
@@ -748,6 +770,7 @@ export default function Home() {
           <small style={{ color: "#71717a", fontSize: "10px" }}>Tap text to edit</small>
         </div>
 
+        {/* Chhota Expression Input */}
         <input
           ref={inputRef}
           type="text"
@@ -755,7 +778,7 @@ export default function Home() {
           onChange={(e) => {
             const val = e.target.value;
             setExpression(val);
-            setDisplay(val || "0");
+            setIsCalculated(false);
             setCursorPos(e.target.selectionStart ?? val.length);
           }}
           onSelect={(e) => {
@@ -772,9 +795,11 @@ export default function Home() {
             width: "100%",
             color: "inherit",
             cursor: "text",
+            overflowX: "auto",
           }}
         />
 
+        {/* Bada Live Result Number (Typing ke sath automatic badhega) */}
         <div className="result">{display}</div>
       </section>
 
@@ -1131,7 +1156,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* PIN Recovery Modal (Emergency 11223344=) */}
+      {/* PIN Recovery Modal */}
       {isRecovering && (
         <div
           style={{
@@ -1320,7 +1345,6 @@ export default function Home() {
             />
           </div>
 
-          {/* Real File Thumbnails */}
           {vaultFiles.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 20px", color: "#71717a" }}>
               <div style={{ fontSize: "40px", marginBottom: "10px" }}>📁</div>
