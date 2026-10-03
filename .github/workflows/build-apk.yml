@@ -16,46 +16,39 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Java JDK 21
+      - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
-
-      - name: Verify Java Version
-        run: |
-          java -version
-          javac -version
-          echo "JAVA_HOME=$JAVA_HOME"
+          java-version: '17'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install Dependencies
+      - name: Install Project Dependencies
         run: npm install
 
-      - name: Build Next.js App
+      - name: Build Next.js Static Export
         run: |
           npm run build
           if [ -d "out/calcpro" ]; then
             cp -r out/calcpro/* out/ || true
           fi
 
-      - name: Setup Capacitor and Android Platform
+      - name: Setup Capacitor v6 (Rock-Solid Stable)
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap add android || true
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 --save
+          rm -rf android
+          npx cap add android
           npx cap sync android
 
       - name: Build APK with Gradle
-        env:
-          JAVA_HOME: ${{ env.JAVA_HOME }}
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon -Dorg.gradle.java.home="$JAVA_HOME"
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
