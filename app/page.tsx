@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 
 type HistoryItem = {
@@ -17,6 +17,9 @@ export default function Home() {
   const [locale, setLocale] = useState("en-IN");
   const [isCalculated, setIsCalculated] = useState(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [cursorPos, setCursorPos] = useState<number>(0);
 
   // Settings & History Load
   useEffect(() => {
@@ -108,13 +111,33 @@ export default function Home() {
         ].slice(0, 30)
       );
 
-      setExpression(String(rawResult));
+      const strResult = String(rawResult);
+      setExpression(strResult);
+      setCursorPos(strResult.length);
       setIsCalculated(true);
     } catch {
       setDisplay("Error");
       setIsCalculated(true);
     }
   }, [expression, formatNumber]);
+
+  // Sync cursor selection back to input
+  const updateInputCursor = (newPos: number) => {
+    setCursorPos(newPos);
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.setSelectionRange(newPos, newPos);
+        inputRef.current.focus();
+      }
+    }, 0);
+  };
+
+  const moveCursor = (direction: "left" | "right") => {
+    triggerHaptic();
+    const current = inputRef.current ? inputRef.current.selectionStart ?? cursorPos : cursorPos;
+    const newPos = direction === "left" ? Math.max(0, current - 1) : Math.min(expression.length, current + 1);
+    updateInputCursor(newPos);
+  };
 
   const deleteHistoryItem = (e: React.MouseEvent, indexToDelete: number) => {
     e.stopPropagation();
@@ -123,8 +146,10 @@ export default function Home() {
 
   const handleHistoryItemClick = (item: HistoryItem) => {
     triggerHaptic();
-    setExpression(item.result.replace(/,/g, ""));
+    const val = item.result.replace(/,/g, "");
+    setExpression(val);
     setDisplay(item.result);
+    setCursorPos(val.length);
     setIsCalculated(true);
 
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -138,9 +163,13 @@ export default function Home() {
     (key: string) => {
       triggerHaptic();
 
+      // Current cursor position detect
+      const currentPos = inputRef.current ? inputRef.current.selectionStart ?? cursorPos : cursorPos;
+
       if (key === "AC") {
         setExpression("");
         setDisplay("0");
+        setCursorPos(0);
         setIsCalculated(false);
         return;
       }
@@ -149,12 +178,18 @@ export default function Home() {
         if (isCalculated) {
           setExpression("");
           setDisplay("0");
+          setCursorPos(0);
           setIsCalculated(false);
           return;
         }
-        const next = expression.slice(0, -1);
+
+        if (currentPos === 0) return;
+
+        // In-place character delete at cursor
+        const next = expression.slice(0, currentPos - 1) + expression.slice(currentPos);
         setExpression(next);
         setDisplay(next || "0");
+        updateInputCursor(currentPos - 1);
         return;
       }
 
@@ -168,8 +203,10 @@ export default function Home() {
         const value = Number(expression || display.replace(/,/g, ""));
         if (!Number.isNaN(value) && value >= 0) {
           const result = Math.sqrt(value);
-          setExpression(String(result));
+          const str = String(result);
+          setExpression(str);
           setDisplay(formatNumber(result));
+          setCursorPos(str.length);
           setIsCalculated(true);
         } else {
           setDisplay("Error");
@@ -181,8 +218,10 @@ export default function Home() {
         const value = Number(expression || display.replace(/,/g, ""));
         if (!Number.isNaN(value)) {
           const result = value ** 2;
-          setExpression(String(result));
+          const str = String(result);
+          setExpression(str);
           setDisplay(formatNumber(result));
+          setCursorPos(str.length);
           setIsCalculated(true);
         }
         return;
@@ -193,9 +232,12 @@ export default function Home() {
         if (isCalculated || !expression) {
           setExpression(val);
           setDisplay("π");
+          setCursorPos(val.length);
         } else {
-          setExpression((prev) => prev + val);
-          setDisplay((prev) => (prev === "0" ? "π" : prev + "π"));
+          const next = expression.slice(0, currentPos) + val + expression.slice(currentPos);
+          setExpression(next);
+          setDisplay(next);
+          updateInputCursor(currentPos + val.length);
         }
         setIsCalculated(false);
         return;
@@ -212,47 +254,63 @@ export default function Home() {
               ? Math.cos(radians)
               : Math.tan(radians);
 
-          setExpression(String(result));
+          const str = String(result);
+          setExpression(str);
           setDisplay(formatNumber(result));
+          setCursorPos(str.length);
           setIsCalculated(true);
         }
         return;
       }
 
-      // Operators
+      // Operators (+, -, *, /, %)
       const operators = ["+", "-", "*", "/", "%"];
       if (operators.includes(key)) {
         setIsCalculated(false);
         if (!expression && key !== "-") return;
 
-        const last = expression.slice(-1);
-        if (operators.includes(last)) {
-          setExpression(expression.slice(0, -1) + key);
+        const prevChar = expression[currentPos - 1];
+        if (operators.includes(prevChar)) {
+          // Replace operator before cursor
+          const next = expression.slice(0, currentPos - 1) + key + expression.slice(currentPos);
+          setExpression(next);
+          setDisplay(next);
+          updateInputCursor(currentPos);
         } else {
-          setExpression(expression + key);
+          // Insert operator at cursor
+          const next = expression.slice(0, currentPos) + key + expression.slice(currentPos);
+          setExpression(next);
+          setDisplay(next);
+          updateInputCursor(currentPos + key.length);
         }
         return;
       }
 
-      // Decimal (.) Prevention for multiples in same segment
+      // Decimal (.) Prevention for segment
       if (key === ".") {
-        const currentSegment = expression.split(/[+\-*/%]/).pop() || "";
-        if (currentSegment.includes(".")) return;
+        const leftExpr = expression.slice(0, currentPos);
+        const rightExpr = expression.slice(currentPos);
+        const lastLeftSegment = leftExpr.split(/[+\-*/%]/).pop() || "";
+        const nextRightSegment = rightExpr.split(/[+\-*/%]/)[0] || "";
+        if (lastLeftSegment.includes(".") || nextRightSegment.includes(".")) return;
       }
 
-      // Continuous Calculation handling: naye digit par fresh start
+      // Continuous fresh start after '='
       if (isCalculated) {
         setIsCalculated(false);
         setExpression(key);
         setDisplay(key);
+        setCursorPos(key.length);
         return;
       }
 
-      const next = expression + key;
+      // In-place digit insertion at cursor
+      const next = expression.slice(0, currentPos) + key + expression.slice(currentPos);
       setExpression(next);
       setDisplay(next);
+      updateInputCursor(currentPos + key.length);
     },
-    [expression, display, isCalculated, calculate, formatNumber]
+    [expression, display, cursorPos, isCalculated, calculate, formatNumber]
   );
 
   useEffect(() => {
@@ -269,6 +327,10 @@ export default function Home() {
         press("DEL");
       } else if (key === "Escape") {
         press("AC");
+      } else if (key === "ArrowLeft") {
+        moveCursor("left");
+      } else if (key === "ArrowRight") {
+        moveCursor("right");
       }
     };
 
@@ -322,8 +384,70 @@ export default function Home() {
         </button>
       </header>
 
+      {/* Screen with Direct Tap & In-Place Editing */}
       <section className="calculator-screen">
-        <div className="expression">{expression || "0"}</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+          {/* Cursor Navigation arrows for quick mobile editing */}
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button
+              onClick={() => moveCursor("left")}
+              aria-label="Move cursor left"
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                color: "inherit",
+                borderRadius: "6px",
+                padding: "2px 8px",
+                fontSize: "12px",
+              }}
+            >
+              ◀
+            </button>
+            <button
+              onClick={() => moveCursor("right")}
+              aria-label="Move cursor right"
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                color: "inherit",
+                borderRadius: "6px",
+                padding: "2px 8px",
+                fontSize: "12px",
+              }}
+            >
+              ▶
+            </button>
+          </div>
+
+          <small style={{ color: "#71717a", fontSize: "10px" }}>Tap text to edit</small>
+        </div>
+
+        {/* Interactive Expression Input */}
+        <input
+          ref={inputRef}
+          type="text"
+          value={expression}
+          onChange={(e) => {
+            const val = e.target.value;
+            setExpression(val);
+            setDisplay(val || "0");
+            setCursorPos(e.target.selectionStart ?? val.length);
+          }}
+          onSelect={(e) => {
+            const target = e.target as HTMLInputElement;
+            setCursorPos(target.selectionStart ?? expression.length);
+          }}
+          placeholder="0"
+          className="expression"
+          style={{
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            textAlign: "right",
+            width: "100%",
+            color: "inherit",
+            cursor: "text",
+          }}
+        />
+
         <div className="result">{display}</div>
       </section>
 
