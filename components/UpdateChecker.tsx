@@ -2,143 +2,107 @@
 
 import { useEffect, useState } from "react";
 
-// Current app version jo is build me hardcoded hai
-const CURRENT_VERSION = "1.0.0";
+// Jo APK phone me chal raha hai, uska version yahan set hota hai
+const CURRENT_APP_VERSION = "1.0.0"; 
+
+// Aapka live GitHub Pages version URL
+const LIVE_VERSION_URL = "https://sameerkhan86926-a11y.github.io/calcpro/version.json";
+
+type VersionInfo = {
+  version: string;
+  downloadUrl: string;
+  whatsNew?: string;
+};
 
 export default function UpdateChecker() {
-  const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [updateData, setUpdateData] = useState<{
-    version: string;
-    downloadUrl: string;
-    whatsNew: string;
-  } | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState<VersionInfo | null>(null);
 
   useEffect(() => {
-    async function checkForUpdate() {
+    const checkForUpdates = async () => {
       try {
-        // Cache bypass karne ke liye timestamp lagaya hai
-        const res = await fetch(`/calcpro/version.json?t=${Date.now()}`);
+        // ?t= lagane se phone purani cached file nahi lega, hamesha fresh data uthayega
+        const res = await fetch(`${LIVE_VERSION_URL}?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+
         if (!res.ok) return;
 
-        const data = await res.json();
+        const data: VersionInfo = await res.json();
 
-        // Agar server version current version se alag hai toh update popup dikhao
-        if (data.version && data.version !== CURRENT_VERSION) {
-          setUpdateData(data);
-          setUpdateAvailable(true);
+        // Agar server ka version current version se alag hai toh update popup dikhao
+        if (data.version && data.version !== CURRENT_APP_VERSION) {
+          setUpdateAvailable(data);
         }
       } catch (err) {
-        console.error("Update check failed", err);
+        console.error("Update check failed:", err);
       }
-    }
+    };
 
-    // App open hone ke 3 second baad check karega
-    const timer = setTimeout(checkForUpdate, 3000);
-    return () => clearTimeout(timer);
+    checkForUpdates();
   }, []);
 
-  if (!updateAvailable || !updateData) return null;
+  if (!updateAvailable) return null;
 
   return (
     <div
       style={{
         position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.75)",
-        backdropFilter: "blur(6px)",
-        zIndex: 999999,
+        top: "16px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "min(400px, calc(100% - 32px))",
+        background: "#1e1b4b",
+        border: "1px solid #38bdf8",
+        borderRadius: "14px",
+        padding: "14px 16px",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+        zIndex: 99999,
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
+        flexDirection: "column",
+        gap: "8px",
+        color: "#ffffff",
       }}
     >
-      <div
-        style={{
-          background: "#0f172a",
-          border: "1px solid #1e293b",
-          borderRadius: "20px",
-          padding: "24px",
-          maxWidth: "340px",
-          width: "100%",
-          textAlign: "center",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
-        }}
-      >
-        <div
-          style={{
-            width: "50px",
-            height: "50px",
-            borderRadius: "50%",
-            background: "rgba(56, 189, 248, 0.15)",
-            color: "#38bdf8",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 16px",
-            fontSize: "24px",
-          }}
-        >
-          🚀
-        </div>
-
-        <h3
-          style={{
-            color: "#fff",
-            fontSize: "19px",
-            fontWeight: "700",
-            margin: "0 0 8px",
-          }}
-        >
-          Update Available!
-        </h3>
-
-        <p
-          style={{
-            color: "#94a3b8",
-            fontSize: "13px",
-            lineHeight: "1.5",
-            margin: "0 0 16px",
-          }}
-        >
-          Version <b>v{updateData.version}</b> ready hai.
-          <br />
-          <span style={{ color: "#38bdf8" }}>{updateData.whatsNew}</span>
-        </p>
-
-        <a
-          href={updateData.downloadUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: "block",
-            background: "linear-gradient(135deg, #0284c7, #2563eb)",
-            color: "#fff",
-            padding: "12px",
-            borderRadius: "12px",
-            fontWeight: "600",
-            textDecoration: "none",
-            fontSize: "15px",
-            marginBottom: "10px",
-          }}
-        >
-          Download Update
-        </a>
-
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <strong style={{ fontSize: "14px", color: "#38bdf8" }}>
+          🚀 New Update Available (v{updateAvailable.version})
+        </strong>
         <button
-          onClick={() => setUpdateAvailable(false)}
+          onClick={() => setUpdateAvailable(null)}
           style={{
             background: "transparent",
             border: "none",
-            color: "#64748b",
-            fontSize: "13px",
+            color: "#a1a1aa",
+            fontSize: "16px",
             cursor: "pointer",
-            padding: "6px",
           }}
         >
-          Remind Me Later
+          ✕
         </button>
       </div>
+
+      <p style={{ fontSize: "12px", color: "#cbd5e1", margin: 0 }}>
+        {updateAvailable.whatsNew || "A new version with performance improvements is ready."}
+      </p>
+
+      <a
+        href={updateAvailable.downloadUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          marginTop: "4px",
+          background: "#2563eb",
+          color: "#ffffff",
+          textAlign: "center",
+          padding: "8px 12px",
+          borderRadius: "8px",
+          textDecoration: "none",
+          fontSize: "12px",
+          fontWeight: "600",
+        }}
+      >
+        Download & Update Now
+      </a>
     </div>
   );
 }
