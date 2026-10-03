@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function EmiPage() {
+  const [dark, setDark] = useState(true);
   const [loanAmount, setLoanAmount] = useState("500000");
   const [interestRate, setInterestRate] = useState("10");
   const [tenure, setTenure] = useState("5");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) setDark(savedTheme === "dark");
+  }, []);
 
   const principal = Number(loanAmount) || 0;
   const annualRate = Number(interestRate) || 0;
@@ -38,7 +44,7 @@ export default function EmiPage() {
     });
 
   return (
-    <main className="app dark emi-page">
+    <main className={`app ${dark ? "dark" : "light"} emi-page`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
@@ -149,22 +155,22 @@ export default function EmiPage() {
       </section>
 
       <nav className="bottom-nav">
-        <Link href="/" className="nav-item active">
+        <Link href="/" className="nav-item">
           <span>⌕</span>
           <small>Calculator</small>
         </Link>
 
-        <Link href="/tools/" className="nav-item">
+        <Link href="/tools/" className="nav-item active">
           <span>+</span>
           <small>Tools</small>
         </Link>
 
-        <Link href="/" className="nav-item">
+        <Link href="/#history" className="nav-item">
           <span>≡</span>
           <small>History</small>
         </Link>
 
-        <Link href="/" className="nav-item">
+        <Link href="/settings/" className="nav-item">
           <span>⚙</span>
           <small>Settings</small>
         </Link>
