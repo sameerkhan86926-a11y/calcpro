@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { numberToIndianWords } from "@/lib/numToWords";
+import { numberToIndianWords } from "../lib/numToWords";
+
 
 type HistoryItem = {
   expression: string;
