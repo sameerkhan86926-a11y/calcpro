@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { numberToIndianWords } from "../lib/numToWords";
+import { numberToIndianWords } from "../../../lib/numToWords";
+
 
 
 const DENOMINATIONS = [500, 200, 100, 50, 20, 10, 5, 2, 1];
