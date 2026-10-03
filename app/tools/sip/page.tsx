@@ -1,28 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function SIPPage() {
+  const [dark, setDark] = useState(true);
   const [monthly, setMonthly] = useState("5000");
   const [rate, setRate] = useState("12");
   const [years, setYears] = useState("10");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) setDark(savedTheme === "dark");
+  }, []);
 
   const p = Number(monthly) || 0;
   const annualRate = Number(rate) || 0;
   const months = (Number(years) || 0) * 12;
   const monthlyRate = annualRate / 12 / 100;
 
+  // Standard SIP Annuity Formula (End-of-month compound growth)
   const futureValue =
-    monthlyRate === 0
+    p <= 0 || months <= 0
+      ? 0
+      : monthlyRate === 0
       ? p * months
       : p *
-        (((Math.pow(1 + monthlyRate, months) - 1) /
-          monthlyRate) *
+        (((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) *
           (1 + monthlyRate));
 
   const invested = p * months;
-  const returns = futureValue - invested;
+  const returns = futureValue > invested ? futureValue - invested : 0;
 
   const money = (n: number) =>
     n.toLocaleString("en-IN", {
@@ -30,7 +38,7 @@ export default function SIPPage() {
     });
 
   return (
-    <main className="app dark emi-page">
+    <main className={`app ${dark ? "dark" : "light"} emi-page`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
@@ -59,6 +67,8 @@ export default function SIPPage() {
               type="number"
               value={monthly}
               onChange={(e) => setMonthly(e.target.value)}
+              min="0"
+              step="500"
             />
           </div>
         </label>
@@ -70,6 +80,8 @@ export default function SIPPage() {
               type="number"
               value={rate}
               onChange={(e) => setRate(e.target.value)}
+              min="0"
+              step="0.5"
             />
             <span>%</span>
           </div>
@@ -82,6 +94,8 @@ export default function SIPPage() {
               type="number"
               value={years}
               onChange={(e) => setYears(e.target.value)}
+              min="1"
+              step="1"
             />
             <span>Years</span>
           </div>
@@ -100,8 +114,8 @@ export default function SIPPage() {
         </div>
 
         <div className="result-row">
-          <span>Estimated Returns</span>
-          <strong>₹{money(returns)}</strong>
+          <span>Estimated Wealth Gain</span>
+          <strong style={{ color: "#22c55e" }}>₹{money(returns)}</strong>
         </div>
       </section>
 
@@ -114,11 +128,11 @@ export default function SIPPage() {
           <span>+</span>
           <small>Tools</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/#history" className="nav-item">
           <span>≡</span>
           <small>History</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/settings/" className="nav-item">
           <span>⚙</span>
           <small>Settings</small>
         </Link>
