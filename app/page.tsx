@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
 type HistoryItem = {
@@ -16,6 +16,7 @@ export default function Home() {
   const [dark, setDark] = useState(true);
   const [locale, setLocale] = useState("en-IN");
   const [isCalculated, setIsCalculated] = useState(false);
+  const [copiedText, setCopiedText] = useState<string | null>(null);
 
   // Settings & History Load
   useEffect(() => {
@@ -114,6 +115,24 @@ export default function Home() {
       setIsCalculated(true);
     }
   }, [expression, formatNumber]);
+
+  const deleteHistoryItem = (e: React.MouseEvent, indexToDelete: number) => {
+    e.stopPropagation();
+    setHistory((prev) => prev.filter((_, idx) => idx !== indexToDelete));
+  };
+
+  const handleHistoryItemClick = (item: HistoryItem) => {
+    triggerHaptic();
+    setExpression(item.result.replace(/,/g, ""));
+    setDisplay(item.result);
+    setIsCalculated(true);
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(item.result);
+      setCopiedText("Copied!");
+      setTimeout(() => setCopiedText(null), 1500);
+    }
+  };
 
   const press = useCallback(
     (key: string) => {
@@ -383,7 +402,14 @@ export default function Home() {
 
       <section className="history-section" id="history">
         <div className="section-title">
-          <span>Recent Calculations</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>Recent Calculations</span>
+            {copiedText && (
+              <small style={{ color: "#22c55e", fontSize: "11px", fontWeight: "600" }}>
+                {copiedText}
+              </small>
+            )}
+          </div>
 
           {history.length > 0 && (
             <button
@@ -393,7 +419,7 @@ export default function Home() {
                 localStorage.removeItem("calcpro-history");
               }}
             >
-              Clear
+              Clear All
             </button>
           )}
         </div>
@@ -406,19 +432,34 @@ export default function Home() {
           </div>
         ) : (
           <div className="history-list">
-            {history.slice(0, 8).map((item, index) => (
-              <button
+            {history.slice(0, 15).map((item, index) => (
+              <div
                 className="history-item"
                 key={`${item.expression}-${index}`}
-                onClick={() => {
-                  setExpression(item.result.replace(/,/g, ""));
-                  setDisplay(item.result);
-                  setIsCalculated(true);
-                }}
+                onClick={() => handleHistoryItemClick(item)}
+                title="Tap to load & copy"
+                style={{ cursor: "pointer" }}
               >
-                <span>{item.expression}</span>
-                <strong>{item.result}</strong>
-              </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
+                  <span>{item.expression}</span>
+                  <strong>{item.result}</strong>
+                </div>
+
+                <button
+                  className="clear-history"
+                  onClick={(e) => deleteHistoryItem(e, index)}
+                  aria-label="Delete calculation"
+                  style={{
+                    fontSize: "18px",
+                    lineHeight: "1",
+                    padding: "6px 10px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
         )}
