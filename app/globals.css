@@ -6,6 +6,8 @@
 
 html {
   scroll-behavior: smooth;
+  width: 100%;
+  height: 100%;
 }
 
 body {
@@ -16,6 +18,16 @@ body {
     "Segoe UI",
     sans-serif;
   background: #09090b;
+  width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto !important; /* Screen scroll ko unlock kiya */
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 button {
@@ -26,9 +38,10 @@ button {
 
 .app {
   min-height: 100vh;
+  min-height: 100dvh;
   max-width: 520px;
   margin: 0 auto;
-  padding: 18px 16px 100px;
+  padding: 18px 16px 120px; /* Bottom nav ke liye safe space */
   transition: 0.25s;
 }
 
@@ -66,9 +79,6 @@ button {
   background-size: cover;
   flex-shrink: 0;
 }
-
-
-
 
 .brand h1 {
   font-size: 20px;
@@ -377,7 +387,7 @@ button {
   position: fixed;
   z-index: 20;
   left: 50%;
-  bottom: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: min(488px, calc(100% - 24px));
   min-height: 66px;
@@ -649,6 +659,7 @@ button {
   overflow-x: auto;
   white-space: nowrap;
 }
+
 /* Settings Page Styling */
 .settings-container {
   display: flex;
@@ -827,53 +838,35 @@ button {
   background: #18181b;
   color: #ffffff;
 }
-/* Sabhi phones ke liye safe area handling */
-html,
-body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  /* 100dvh har phone ke dynamic browser bar ko real-time measure karta hai */
-  height: 100dvh;
-  overflow: hidden;
-  background-color: #09090b;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
 
-/* Main App Wrapper jo full screen cover karega */
+/* App Wrapper for Adaptive Screens */
 .app-wrapper {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  min-height: 100dvh;
   width: 100%;
-  max-width: 480px; /* Tablet ya badi screen par calculator stretch na ho */
+  max-width: 480px;
   margin: 0 auto;
   box-sizing: border-box;
   padding-top: max(8px, env(safe-area-inset-top));
-  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  padding-bottom: max(100px, calc(env(safe-area-inset-bottom) + 80px));
   padding-left: max(12px, env(safe-area-inset-left));
   padding-right: max(12px, env(safe-area-inset-right));
 }
 
-/* Keypad Grid (Responsive Buttons) */
 .calc-keypad {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: clamp(6px, 1.8vw, 12px); /* Chhoti screen par kam gap, badi par zyada gap */
+  gap: clamp(6px, 1.8vw, 12px);
   width: 100%;
-  margin-top: auto; /* Display ke baad keypad ko natural bottom par push karega */
+  margin-top: 16px;
 }
 
-/* Buttons ka size har phone ke hisaab se auto scale hoga */
 .calc-btn {
-  aspect-ratio: 1 / 1; /* Hamesha perfect round ya square rahenge */
+  aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(18px, 5vw, 26px); /* Font kabhi screen se bahar nahi phootega */
-  touch-action: manipulation; /* Mobile click delay zero karta hai */
+  font-size: clamp(18px, 5vw, 26px);
+  touch-action: manipulation;
 }
-
