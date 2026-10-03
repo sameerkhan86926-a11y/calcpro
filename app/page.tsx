@@ -1,380 +1,502 @@
-"use client";
+“use client”;
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from “react”;
+import Link from “next/link”;
 
 type HistoryItem = {
-  expression: string;
-  result: string;
+expression: string;
+result: string;
 };
 
 export default function Home() {
-  const [expression, setExpression] = useState("");
-  const [display, setDisplay] = useState("0");
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [scientific, setScientific] = useState(false);
-  const [dark, setDark] = useState(true);
+const [expression, setExpression] = useState(””);
+const [display, setDisplay] = useState(“0”);
+const [history, setHistory] = useState<HistoryItem[]>([]);
+const [scientific, setScientific] = useState(false);
+const [dark, setDark] = useState(true);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("calcpro-history");
+useEffect(() => {
+const saved = localStorage.getItem(“calcpro-history”);
 
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch {
-        setHistory([]);
-      }
-    }
-  }, []);
+if (saved) {
+  try {
+    setHistory(JSON.parse(saved));
+  } catch {
+    setHistory([]);
+  }
+}
 
-  useEffect(() => {
-    localStorage.setItem("calcpro-history", JSON.stringify(history));
-  }, [history]);
+}, []);
 
-  const formatNumber = (value: number) => {
-    if (!Number.isFinite(value)) return "Error";
+useEffect(() => {
+localStorage.setItem(
+“calcpro-history”,
+JSON.stringify(history)
+);
+}, [history]);
 
-    return Number(value.toFixed(10)).toLocaleString("en-IN", {
-      maximumFractionDigits: 10,
-    });
-  };
+const formatNumber = (value: number) => {
+if (!Number.isFinite(value)) return “Error”;
 
-  const calculate = () => {
-    if (!expression) return;
+return Number(value.toFixed(10)).toLocaleString("en-IN", {
+  maximumFractionDigits: 10,
+});
 
-    try {
-      const safeExpression = expression.replace(/,/g, "");
+};
 
-      if (!/^[0-9+\-*/().%\s]+$/.test(safeExpression)) {
-        throw new Error("Invalid");
-      }
+const calculate = () => {
+if (!expression) return;
 
-      const result = Function(
-        `"use strict"; return (${safeExpression})`
-      )();
+try {
+  const safeExpression = expression.replace(/,/g, "");
 
-      const formatted = formatNumber(Number(result));
+  if (!/^[0-9+\-*/().%\s]+$/.test(safeExpression)) {
+    throw new Error("Invalid");
+  }
 
-      setDisplay(formatted);
-      setHistory((prev) => [
-        {
-          expression,
-          result: formatted,
-        },
-        ...prev,
-      ].slice(0, 30));
+  const result = Function(
+    `"use strict"; return (${safeExpression})`
+  )();
 
-      setExpression(String(result));
-    } catch {
-      setDisplay("Error");
-    }
-  };
+  const formatted = formatNumber(Number(result));
 
-  const press = (key: string) => {
-    if (key === "AC") {
-      setExpression("");
-      setDisplay("0");
-      return;
-    }
+  setDisplay(formatted);
 
-    if (key === "DEL") {
-      const next = expression.slice(0, -1);
-      setExpression(next);
-      setDisplay(next || "0");
-      return;
-    }
+  setHistory((prev) => [
+    {
+      expression,
+      result: formatted,
+    },
+    ...prev,
+  ].slice(0, 30));
 
-    if (key === "=") {
-      calculate();
-      return;
-    }
+  setExpression(String(result));
+} catch {
+  setDisplay("Error");
+}
 
-    if (key === "√") {
-      const value = Number(expression || display.replace(/,/g, ""));
+};
 
-      if (!Number.isNaN(value)) {
-        const result = Math.sqrt(value);
-        setExpression(String(result));
-        setDisplay(formatNumber(result));
-      }
+const press = (key: string) => {
+if (key === “AC”) {
+setExpression(””);
+setDisplay(“0”);
+return;
+}
 
-      return;
-    }
+if (key === "DEL") {
+  const next = expression.slice(0, -1);
 
-    if (key === "x²") {
-      const value = Number(expression || display.replace(/,/g, ""));
+  setExpression(next);
+  setDisplay(next || "0");
+  return;
+}
 
-      if (!Number.isNaN(value)) {
-        const result = value ** 2;
-        setExpression(String(result));
-        setDisplay(formatNumber(result));
-      }
+if (key === "=") {
+  calculate();
+  return;
+}
 
-      return;
-    }
+if (key === "√") {
+  const value = Number(
+    expression || display.replace(/,/g, "")
+  );
 
-    if (key === "π") {
-      setExpression((prev) => prev + Math.PI);
-      setDisplay((prev) => (prev === "0" ? "π" : prev + "π"));
-      return;
-    }
+  if (!Number.isNaN(value)) {
+    const result = Math.sqrt(value);
 
-    if (key === "sin" || key === "cos" || key === "tan") {
-      const value = Number(expression || display.replace(/,/g, ""));
+    setExpression(String(result));
+    setDisplay(formatNumber(result));
+  }
 
-      if (!Number.isNaN(value)) {
-        const radians = (value * Math.PI) / 180;
+  return;
+}
 
-        const result =
-          key === "sin"
-            ? Math.sin(radians)
-            : key === "cos"
-              ? Math.cos(radians)
-              : Math.tan(radians);
+if (key === "x²") {
+  const value = Number(
+    expression || display.replace(/,/g, "")
+  );
 
-        setExpression(String(result));
-        setDisplay(formatNumber(result));
-      }
+  if (!Number.isNaN(value)) {
+    const result = value ** 2;
 
-      return;
-    }
+    setExpression(String(result));
+    setDisplay(formatNumber(result));
+  }
 
-    const operators = ["+", "-", "*", "/", "%"];
+  return;
+}
 
-    if (operators.includes(key)) {
-      if (!expression && key !== "-") return;
+if (key === "π") {
+  setExpression((prev) => prev + Math.PI);
 
-      const last = expression.slice(-1);
+  setDisplay((prev) =>
+    prev === "0" ? "π" : prev + "π"
+  );
 
-      if (operators.includes(last)) {
-        setExpression(expression.slice(0, -1) + key);
-      } else {
-        setExpression(expression + key);
-      }
+  return;
+}
 
-      return;
-    }
+if (
+  key === "sin" ||
+  key === "cos" ||
+  key === "tan"
+) {
+  const value = Number(
+    expression || display.replace(/,/g, "")
+  );
 
-    const next = expression + key;
+  if (!Number.isNaN(value)) {
+    const radians = (value * Math.PI) / 180;
 
-    setExpression(next);
-    setDisplay(next);
-  };
+    const result =
+      key === "sin"
+        ? Math.sin(radians)
+        : key === "cos"
+          ? Math.cos(radians)
+          : Math.tan(radians);
 
-  useEffect(() => {
-    const handleKeyboard = (event: KeyboardEvent) => {
-      const key = event.key;
+    setExpression(String(result));
+    setDisplay(formatNumber(result));
+  }
 
-      if (/^[0-9.]$/.test(key)) {
-        press(key);
-      } else if (["+", "-", "*", "/", "%"].includes(key)) {
-        press(key);
-      } else if (key === "Enter" || key === "=") {
-        press("=");
-      } else if (key === "Backspace") {
-        press("DEL");
-      } else if (key === "Escape") {
-        press("AC");
-      }
-    };
+  return;
+}
 
-    window.addEventListener("keydown", handleKeyboard);
+const operators = ["+", "-", "*", "/", "%"];
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyboard);
-    };
-  });
+if (operators.includes(key)) {
+  if (!expression && key !== "-") return;
 
-  const basicKeys = [
-    "AC",
-    "DEL",
-    "%",
-    "/",
-    "7",
-    "8",
-    "9",
-    "*",
-    "4",
-    "5",
-    "6",
-    "-",
-    "1",
-    "2",
-    "3",
-    "+",
-    "0",
-    ".",
-    "=",
-  ];
+  const last = expression.slice(-1);
 
-  const scientificKeys = [
-    "sin",
-    "cos",
-    "tan",
-    "√",
-    "x²",
-    "π",
-  ];
+  if (operators.includes(last)) {
+    setExpression(
+      expression.slice(0, -1) + key
+    );
+  } else {
+    setExpression(expression + key);
+  }
 
-  return (
-    <main className={`app ${dark ? "dark" : "light"}`}>
-      <header className="app-header">
-        <div className="brand">
-          <div className="brand-icon">C</div>
+  return;
+}
 
-          <div>
-            <h1>CalcPro</h1>
-            <p>Smart Calculator</p>
-          </div>
-        </div>
+const next = expression + key;
 
-        <button
-          className="icon-button"
-          onClick={() => setDark((value) => !value)}
-          aria-label="Toggle theme"
-        >
-          {dark ? "☼" : "☾"}
-        </button>
-      </header>
+setExpression(next);
+setDisplay(next);
 
-      <section className="calculator-screen">
-        <div className="expression">
-          {expression || "0"}
-        </div>
+};
 
-        <div className="result">
-          {display}
-        </div>
-      </section>
+useEffect(() => {
+const handleKeyboard = (event: KeyboardEvent) => {
+const key = event.key;
 
-      <div className="mode-row">
-        <button
-          className={!scientific ? "mode active" : "mode"}
-          onClick={() => setScientific(false)}
-        >
-          Basic
-        </button>
+  if (/^[0-9.]$/.test(key)) {
+    press(key);
+  } else if (
+    ["+", "-", "*", "/", "%"].includes(key)
+  ) {
+    press(key);
+  } else if (
+    key === "Enter" ||
+    key === "="
+  ) {
+    press("=");
+  } else if (key === "Backspace") {
+    press("DEL");
+  } else if (key === "Escape") {
+    press("AC");
+  }
+};
 
-        <button
-          className={scientific ? "mode active" : "mode"}
-          onClick={() => setScientific(true)}
-        >
-          Scientific
-        </button>
+window.addEventListener(
+  "keydown",
+  handleKeyboard
+);
+
+return () => {
+  window.removeEventListener(
+    "keydown",
+    handleKeyboard
+  );
+};
+
+});
+
+const basicKeys = [
+“AC”,
+“DEL”,
+“%”,
+“/”,
+“7”,
+“8”,
+“9”,
+“*”,
+“4”,
+“5”,
+“6”,
+“-”,
+“1”,
+“2”,
+“3”,
+“+”,
+“0”,
+“.”,
+“=”,
+];
+
+const scientificKeys = [
+“sin”,
+“cos”,
+“tan”,
+“√”,
+“x²”,
+“π”,
+];
+
+return (
+<main className={app ${dark ? "dark" : "light"}}>
+
+  <header className="app-header">
+    <div className="brand">
+      <div className="brand-icon">C</div>
+
+      <div>
+        <h1>CalcPro</h1>
+        <p>Smart Calculator</p>
       </div>
+    </div>
 
-      {scientific && (
-        <section className="scientific-panel">
-          {scientificKeys.map((key) => (
+    <button
+      className="icon-button"
+      onClick={() => setDark((value) => !value)}
+      aria-label="Toggle theme"
+    >
+      {dark ? "Light" : "Dark"}
+    </button>
+  </header>
+
+  <section className="calculator-screen">
+    <div className="expression">
+      {expression || "0"}
+    </div>
+
+    <div className="result">
+      {display}
+    </div>
+  </section>
+
+  <div className="mode-row">
+    <button
+      className={
+        !scientific
+          ? "mode active"
+          : "mode"
+      }
+      onClick={() => setScientific(false)}
+    >
+      Basic
+    </button>
+
+    <button
+      className={
+        scientific
+          ? "mode active"
+          : "mode"
+      }
+      onClick={() => setScientific(true)}
+    >
+      Scientific
+    </button>
+  </div>
+
+  {scientific && (
+    <section className="scientific-panel">
+      {scientificKeys.map((key) => (
+        <button
+          key={key}
+          className="scientific-key"
+          onClick={() => press(key)}
+        >
+          {key}
+        </button>
+      ))}
+    </section>
+  )}
+
+  <section className="keypad">
+    {basicKeys.map((key) => {
+      const isOperator = [
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+      ].includes(key);
+
+      const isDanger = key === "AC";
+      const isUtility = key === "DEL";
+      const isEqual = key === "=";
+
+      return (
+        <button
+          key={key}
+          className={[
+            "key",
+            isOperator
+              ? "operator"
+              : "",
+            isDanger
+              ? "danger"
+              : "",
+            isUtility
+              ? "utility"
+              : "",
+            isEqual
+              ? "equals"
+              : "",
+          ].join(" ")}
+          onClick={() => press(key)}
+        >
+          {key === "*"
+            ? "×"
+            : key === "/"
+              ? "÷"
+              : key}
+        </button>
+      );
+    })}
+  </section>
+
+  <section className="quick-tools">
+    <div className="section-title">
+      <span>Quick Tools</span>
+
+      <Link
+        href="/tools/"
+        className="small-text"
+      >
+        View All
+      </Link>
+    </div>
+
+    <div className="tool-grid">
+
+      <Link href="/tools/emi/">
+        EMI
+      </Link>
+
+      <Link href="/tools/gst/">
+        GST
+      </Link>
+
+      <Link href="/tools/sip/">
+        SIP
+      </Link>
+
+      <Link href="/tools/simple-interest/">
+        Interest
+      </Link>
+
+    </div>
+  </section>
+
+  <section
+    className="history-section"
+    id="history"
+  >
+    <div className="section-title">
+      <span>Recent Calculations</span>
+
+      {history.length > 0 && (
+        <button
+          className="clear-history"
+          onClick={() => setHistory([])}
+        >
+          Clear
+        </button>
+      )}
+    </div>
+
+    {history.length === 0 ? (
+      <div className="empty-history">
+        <div className="empty-icon">=</div>
+
+        <p>No calculations yet</p>
+
+        <span>
+          Your recent calculations will
+          appear here.
+        </span>
+      </div>
+    ) : (
+      <div className="history-list">
+        {history
+          .slice(0, 8)
+          .map((item, index) => (
             <button
-              key={key}
-              className="scientific-key"
-              onClick={() => press(key)}
+              className="history-item"
+              key={`${item.expression}-${index}`}
+              onClick={() => {
+                setExpression(
+                  item.result.replace(/,/g, "")
+                );
+
+                setDisplay(item.result);
+              }}
             >
-              {key}
+              <span>
+                {item.expression}
+              </span>
+
+              <strong>
+                {item.result}
+              </strong>
             </button>
           ))}
-        </section>
-      )}
+      </div>
+    )}
+  </section>
 
-      <section className="keypad">
-        {basicKeys.map((key) => {
-          const isOperator = ["+", "-", "*", "/", "%"].includes(key);
-          const isDanger = key === "AC";
-          const isUtility = key === "DEL";
-          const isEqual = key === "=";
+  <nav className="bottom-nav">
 
-          return (
-            <button
-              key={key}
-              className={[
-                "key",
-                isOperator ? "operator" : "",
-                isDanger ? "danger" : "",
-                isUtility ? "utility" : "",
-                isEqual ? "equals" : "",
-              ].join(" ")}
-              onClick={() => press(key)}
-            >
-              {key === "*" ? "×" : key === "/" ? "÷" : key}
-            </button>
-          );
-        })}
-      </section>
+    <Link
+      href="/"
+      className="nav-item active"
+    >
+      <span>Calculator</span>
+      <small>Home</small>
+    </Link>
 
-      <section className="quick-tools">
-        <div className="section-title">
-          <span>Quick Tools</span>
-          <span className="small-text">Coming soon</span>
-        </div>
+    <Link
+      href="/tools/"
+      className="nav-item"
+    >
+      <span>Tools</span>
+      <small>Calculators</small>
+    </Link>
 
-        <div className="tool-grid">
-          <button>EMI</button>
-          <button>GST</button>
-          <button>SIP</button>
-          <button>Interest</button>
-        </div>
-      </section>
+    <a
+      href="#history"
+      className="nav-item"
+    >
+      <span>History</span>
+      <small>Recent</small>
+    </a>
 
-      <section className="history-section">
-        <div className="section-title">
-          <span>Recent Calculations</span>
+    <button
+      className="nav-item"
+      onClick={() => setDark((value) => !value)}
+    >
+      <span>Theme</span>
+      <small>
+        {dark ? "Dark" : "Light"}
+      </small>
+    </button>
 
-          {history.length > 0 && (
-            <button
-              className="clear-history"
-              onClick={() => setHistory([])}
-            >
-              Clear
-            </button>
-          )}
-        </div>
+  </nav>
 
-        {history.length === 0 ? (
-          <div className="empty-history">
-            <div className="empty-icon">=</div>
-            <p>No calculations yet</p>
-            <span>Your recent calculations will appear here.</span>
-          </div>
-        ) : (
-          <div className="history-list">
-            {history.slice(0, 8).map((item, index) => (
-              <button
-                className="history-item"
-                key={`${item.expression}-${index}`}
-                onClick={() => {
-                  setExpression(item.result.replace(/,/g, ""));
-                  setDisplay(item.result);
-                }}
-              >
-                <span>{item.expression}</span>
-                <strong>{item.result}</strong>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <nav className="bottom-nav">
-        <button className="nav-item active">
-          <span>⌕</span>
-          <small>Calculator</small>
-        </button>
-
-        <button className="nav-item">
-          <span>+</span>
-          <small>Tools</small>
-        </button>
-
-        <button className="nav-item">
-          <span>≡</span>
-          <small>History</small>
-        </button>
-
-        <button className="nav-item">
-          <span>⚙</span>
-          <small>Settings</small>
-        </button>
-      </nav>
-    </main>
-  );
+</main>
+);
 }
