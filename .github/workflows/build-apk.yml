@@ -31,7 +31,13 @@ jobs:
         run: npm install
 
       - name: Build Next.js App
-        run: npm run build
+        run: |
+          npm run build
+          # Safety check: agar out/calcpro bana ho toh use out root par sync karein
+          if [ -d "out/calcpro" ]; then
+            cp -r out/calcpro/* out/ || true
+          fi
+          ls -la out
 
       - name: Setup Capacitor and Android Platform
         run: |
