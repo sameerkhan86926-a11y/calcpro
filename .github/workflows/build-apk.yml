@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build and Auto-Release Android APK
 
 on:
   push:
@@ -27,19 +27,35 @@ jobs:
         with:
           node-version: 20
 
+      - name: Read Version & Details from version.json
+        id: ver
+        run: |
+          python3 -c '
+          import json, os
+          with open("public/version.json", "r") as f:
+              data = json.load(f)
+          v = data.get("version", "1.0.0").strip()
+          w = data.get("whatsNew", "New updates and fixes.").strip()
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"version={v}\n")
+              out.write(f"tag=v{v}\n")
+              out.write(f"notes={w}\n")
+          print(f"Detected Version: {v}")
+          '
+
       - name: Install Project Dependencies
         run: npm install
 
       - name: Build Next.js App for Mobile
         run: IS_CAPACITOR=true npm run build
 
-      - name: Setup Capacitor & Splash Screen Plugin
+      - name: Setup Capacitor Platform
         run: |
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/splash-screen@6 --save
           rm -rf android
           npx cap add android
 
-      - name: Generate App Icons and Splash Screens
+      - name: Inject Custom App Icons and Splash
         run: |
           python3 -c '
           import os, shutil
@@ -58,26 +74,11 @@ jobs:
                   break
 
           if src:
-              print(f"Using source graphic: {src}")
               res_dir = "android/app/src/main/res"
-
-              # 1. Launcher icons replace karein
               for root, dirs, files in os.walk(res_dir):
                   for f in files:
                       if "ic_launcher" in f and f.endswith(".png"):
                           shutil.copyfile(src, os.path.join(root, f))
-
-              # 2. Splash screen drawables generate karein
-              splash_dirs = [
-                  "drawable",
-                  "drawable-land-mdpi", "drawable-land-hdpi", "drawable-land-xhdpi", "drawable-land-xxhdpi", "drawable-land-xxxhdpi",
-                  "drawable-port-mdpi", "drawable-port-hdpi", "drawable-port-xhdpi", "drawable-port-xxhdpi", "drawable-port-xxxhdpi"
-              ]
-              for s_dir in splash_dirs:
-                  target_folder = os.path.join(res_dir, s_dir)
-                  os.makedirs(target_folder, exist_ok=True)
-                  shutil.copyfile(src, os.path.join(target_folder, "splash.png"))
-              print("Splash screen assets generated.")
           '
           npx cap sync android
 
@@ -87,8 +88,15 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+      - name: Auto Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: CalcPro-Debug-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: CalcPro ${{ steps.ver.outputs.tag }}
+          body: ${{ steps.ver.outputs.notes }}
+          draft: false
+          prerelease: false
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
