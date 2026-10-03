@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function DiscountPage() {
+  const [dark, setDark] = useState(true);
   const [price, setPrice] = useState("2000");
   const [discount, setDiscount] = useState("20");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("calcpro-theme");
+    if (savedTheme !== null) setDark(savedTheme === "dark");
+  }, []);
 
   const original = Number(price) || 0;
   const rate = Number(discount) || 0;
@@ -19,7 +25,7 @@ export default function DiscountPage() {
     });
 
   return (
-    <main className="app dark emi-page">
+    <main className={`app ${dark ? "dark" : "light"} emi-page`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon">C</div>
@@ -49,6 +55,7 @@ export default function DiscountPage() {
               type="number"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+              min="0"
             />
           </div>
         </label>
@@ -60,6 +67,9 @@ export default function DiscountPage() {
               type="number"
               value={discount}
               onChange={(e) => setDiscount(e.target.value)}
+              min="0"
+              max="100"
+              step="0.1"
             />
             <span>%</span>
           </div>
@@ -92,11 +102,11 @@ export default function DiscountPage() {
           <span>+</span>
           <small>Tools</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/#history" className="nav-item">
           <span>≡</span>
           <small>History</small>
         </Link>
-        <Link href="/" className="nav-item">
+        <Link href="/settings/" className="nav-item">
           <span>⚙</span>
           <small>Settings</small>
         </Link>
