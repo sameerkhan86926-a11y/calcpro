@@ -198,7 +198,8 @@ button {
 
 .key:active,
 .scientific-key:active,
-.tool-grid button:active {
+.tool-grid button:active,
+.tool-grid a:active {
   transform: scale(0.95);
 }
 
@@ -251,6 +252,7 @@ button {
   color: #71717a;
   font-size: 11px;
   font-weight: 500;
+  text-decoration: none;
 }
 
 .tool-grid {
@@ -259,16 +261,25 @@ button {
   gap: 8px;
 }
 
-.tool-grid button {
+.tool-grid button,
+.tool-grid a {
   min-height: 62px;
   border-radius: 16px;
   background: #18181b;
   color: #ffffff;
   font-size: 12px;
   font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  text-align: center;
+  transition: transform 0.08s;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.light .tool-grid button {
+.light .tool-grid button,
+.light .tool-grid a {
   background: #ffffff;
   color: #18181b;
 }
@@ -391,6 +402,7 @@ button {
   border-radius: 14px;
   background: transparent;
   color: #71717a;
+  text-decoration: none;
 }
 
 .nav-item span {
@@ -427,6 +439,7 @@ button {
     min-height: 145px;
   }
 }
+
 .back-button {
   display: flex;
   align-items: center;
