@@ -226,6 +226,9 @@ export default function Home() {
   const [vaultFiles, setVaultFiles] = useState<VaultFile[]>([]);
   const [vaultPasscode, setVaultPasscode] = useState<string | null>(null);
 
+  // Onboarding Hint (First time user)
+  const [showVaultIntro, setShowVaultIntro] = useState(false);
+
   // First Time Setup States
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [newPin, setNewPin] = useState("");
@@ -239,11 +242,11 @@ export default function Home() {
   const [resetNewPin, setResetNewPin] = useState("");
   const [recoveryError, setRecoveryError] = useState("");
 
-  // Full Screen Preview
   const [previewFile, setPreviewFile] = useState<{ url: string; file: VaultFile } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const [cursorPos, setCursorPos] = useState<number>(0);
 
   useEffect(() => {
@@ -267,6 +270,12 @@ export default function Home() {
       setVaultPasscode(savedPin);
     } else {
       setVaultPasscode(null);
+    }
+
+    // Check first-time intro guide
+    const introShown = localStorage.getItem("calcpro-vault-intro");
+    if (!introShown) {
+      setShowVaultIntro(true);
     }
 
     getFilesFromDB()
@@ -322,6 +331,29 @@ export default function Home() {
     return Number(res);
   };
 
+  // Secret Header Long-Press Trigger
+  const handleLogoTouchStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      triggerHaptic();
+      if (!vaultPasscode) {
+        setIsSettingPin(true);
+      } else {
+        setIsRecovering(true);
+      }
+    }, 1800);
+  };
+
+  const handleLogoTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+  };
+
+  const handleCloseIntro = () => {
+    localStorage.setItem("calcpro-vault-intro", "true");
+    setShowVaultIntro(false);
+  };
+
   const handleSaveInitialPin = () => {
     if (newPin.length < 4) {
       setPinError("PIN must be at least 4 digits");
@@ -372,7 +404,7 @@ export default function Home() {
     if (!expression) return;
     const cleanExpr = expression.trim();
 
-    // 1. Master Emergency Rescue Code (11223344=)
+    // 1. Emergency Master Rescue Code
     if (cleanExpr === "11223344") {
       triggerHaptic();
       setExpression("");
@@ -654,8 +686,17 @@ export default function Home() {
 
   return (
     <main className={`app ${dark ? "dark" : "light"}`}>
+      {/* Header with Long-Press Secret Gesture */}
       <header className="app-header">
-        <div className="brand">
+        <div
+          className="brand"
+          onMouseDown={handleLogoTouchStart}
+          onMouseUp={handleLogoTouchEnd}
+          onTouchStart={handleLogoTouchStart}
+          onTouchEnd={handleLogoTouchEnd}
+          style={{ userSelect: "none", cursor: "pointer" }}
+          title="Long-press for secret vault"
+        >
           <div className="brand-icon">C</div>
           <div>
             <h1>CalcPro</h1>
@@ -899,6 +940,58 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* Discreet 1-Time User Onboarding Popup */}
+      {showVaultIntro && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(6px)",
+            zIndex: 9998,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              background: dark ? "#18181b" : "#fff",
+              color: dark ? "#fff" : "#18181b",
+              borderRadius: "16px",
+              padding: "24px",
+              maxWidth: "340px",
+              textAlign: "center",
+              border: "1px solid rgba(255,255,255,0.1)",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+            }}
+          >
+            <div style={{ fontSize: "36px", marginBottom: "8px" }}>🔐</div>
+            <h3 style={{ margin: "0 0 8px 0", fontSize: "18px" }}>Private Space Included</h3>
+            <p style={{ fontSize: "13px", color: "#a1a1aa", lineHeight: "1.5", margin: "0 0 16px 0" }}>
+              To access your secret vault anytime, enter <strong>1234</strong> and press <strong>=</strong>, or long-press the <strong>CalcPro</strong> title above.
+            </p>
+            <button
+              onClick={handleCloseIntro}
+              style={{
+                width: "100%",
+                background: "#2563eb",
+                color: "#fff",
+                border: "none",
+                padding: "10px",
+                borderRadius: "10px",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+              }}
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Set Secret PIN Modal */}
       {isSettingPin && (
