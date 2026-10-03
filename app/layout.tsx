@@ -20,14 +20,13 @@ export default function RootLayout({
           content="Scientific calculator, financial tools, and hidden vault."
         />
 
-        {/* PWA & Icons (Zip wali files ka exact direct setup) */}
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        
-        {/* iOS / Mobile Home Screen meta */}
+        {/* basePath /calcpro ke sath match kiye hue icons */}
+        <link rel="manifest" href="/calcpro/manifest.json" />
+        <link rel="icon" href="/calcpro/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/calcpro/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/calcpro/favicon-16x16.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/calcpro/apple-touch-icon.png" />
+
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="CalcPro" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
