@@ -12,12 +12,67 @@ type VaultFile = {
   id: string;
   name: string;
   type: string;
-  dataUrl: string;
+  blob: Blob;
   size: number;
   date: string;
 };
 
-// Web Audio API Lag-Free Click Sound
+// ---------------- IndexedDB Safe Storage Engine ----------------
+const DB_NAME = "CalcProVaultDB";
+const STORE_NAME = "hidden_files";
+
+const openDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      reject("IndexedDB not supported");
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const saveFileToDB = async (file: VaultFile) => {
+  const db = await openDB();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    store.put(file);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+};
+
+const getFilesFromDB = async (): Promise<VaultFile[]> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const deleteFileFromDB = async (id: string) => {
+  const db = await openDB();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    store.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+};
+
+// ---------------- Web Audio Feedback ----------------
 const playKeySound = () => {
   if (typeof window === "undefined") return;
   const isSoundEnabled = localStorage.getItem("calcpro-sound") !== "false";
@@ -61,14 +116,18 @@ export default function Home() {
   // Vault States
   const [vaultOpen, setVaultOpen] = useState(false);
   const [vaultFiles, setVaultFiles] = useState<VaultFile[]>([]);
-  const [vaultPasscode, setVaultPasscode] = useState("1234"); // Default Secret PIN
-  const [previewFile, setPreviewFile] = useState<VaultFile | null>(null);
+  const [vaultPasscode, setVaultPasscode] = useState<string | null>(null);
+  const [isSettingPin, setIsSettingPin] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [previewFile, setPreviewFile] = useState<{ url: string; file: VaultFile } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<number>(0);
 
-  // Settings & Vault Load
+  // Load Settings, History, and Hidden Files
   useEffect(() => {
     const savedTheme = localStorage.getItem("calcpro-theme");
     if (savedTheme !== null) setDark(savedTheme === "dark");
@@ -86,26 +145,21 @@ export default function Home() {
     }
 
     const savedPin = localStorage.getItem("calcpro-vault-pin");
-    if (savedPin) setVaultPasscode(savedPin);
-
-    const savedVault = localStorage.getItem("calcpro-vault-files");
-    if (savedVault) {
-      try {
-        setVaultFiles(JSON.parse(savedVault));
-      } catch {
-        setVaultFiles([]);
-      }
+    if (savedPin) {
+      setVaultPasscode(savedPin);
+    } else {
+      setVaultPasscode(null);
     }
+
+    // Load from IndexedDB
+    getFilesFromDB()
+      .then((files) => setVaultFiles(files))
+      .catch((err) => console.error("Could not load vault items", err));
   }, []);
 
-  // Sync History & Vault
   useEffect(() => {
     localStorage.setItem("calcpro-history", JSON.stringify(history));
   }, [history]);
-
-  useEffect(() => {
-    localStorage.setItem("calcpro-vault-files", JSON.stringify(vaultFiles));
-  }, [vaultFiles]);
 
   const triggerHaptic = () => {
     if (typeof window !== "undefined" && "vibrate" in navigator) {
@@ -151,13 +205,43 @@ export default function Home() {
     return Number(res);
   };
 
+  const handleSaveInitialPin = () => {
+    if (newPin.length < 4) {
+      setPinError("PIN must be at least 4 digits");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinError("PINs do not match");
+      return;
+    }
+    localStorage.setItem("calcpro-vault-pin", newPin);
+    setVaultPasscode(newPin);
+    setIsSettingPin(false);
+    setNewPin("");
+    setConfirmPin("");
+    setPinError("");
+    setVaultOpen(true);
+  };
+
   const calculate = useCallback(() => {
     if (!expression) return;
+    const cleanExpr = expression.trim();
 
-    // Check Secret PIN for Vault trigger (e.g. typing 1234 and pressing '=')
-    if (expression.trim() === vaultPasscode) {
+    // 1. Agar user ne pehle PIN set kiya hua hai aur wahi type karke '=' dabaya:
+    if (vaultPasscode && cleanExpr === vaultPasscode) {
       triggerHaptic();
       setVaultOpen(true);
+      setExpression("");
+      setDisplay("0");
+      setCursorPos(0);
+      return;
+    }
+
+    // 2. Agar user ne PIN set nahi kiya aur koi 4+ digit number enter karke unlock karna chahta hai:
+    // (Prompt to set password if no PIN is set)
+    if (!vaultPasscode && /^\d{4,8}$/.test(cleanExpr) && cleanExpr === "1234") {
+      triggerHaptic();
+      setIsSettingPin(true);
       setExpression("");
       setDisplay("0");
       setCursorPos(0);
@@ -207,33 +291,55 @@ export default function Home() {
     updateInputCursor(newPos);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        const newFile: VaultFile = {
-          id: `${Date.now()}-${Math.random()}`,
-          name: file.name,
-          type: file.type,
-          dataUrl: base64,
-          size: file.size,
-          date: new Date().toLocaleDateString(),
-        };
-        setVaultFiles((prev) => [newFile, ...prev]);
+    const fileList = Array.from(files);
+    for (const file of fileList) {
+      const newFile: VaultFile = {
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        name: file.name,
+        type: file.type,
+        blob: file,
+        size: file.size,
+        date: new Date().toLocaleDateString(),
       };
-      reader.readAsDataURL(file);
-    });
+
+      try {
+        await saveFileToDB(newFile);
+        setVaultFiles((prev) => [newFile, ...prev]);
+      } catch (err) {
+        console.error("Storage error:", err);
+      }
+    }
 
     e.target.value = "";
   };
 
-  const deleteVaultFile = (id: string) => {
-    setVaultFiles((prev) => prev.filter((f) => f.id !== id));
-    if (previewFile?.id === id) setPreviewFile(null);
+  const deleteVaultFile = async (id: string) => {
+    try {
+      await deleteFileFromDB(id);
+      setVaultFiles((prev) => prev.filter((f) => f.id !== id));
+      if (previewFile?.file.id === id) {
+        URL.revokeObjectURL(previewFile.url);
+        setPreviewFile(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete", err);
+    }
+  };
+
+  const openPreview = (file: VaultFile) => {
+    const url = URL.createObjectURL(file.blob);
+    setPreviewFile({ url, file });
+  };
+
+  const closePreview = () => {
+    if (previewFile) {
+      URL.revokeObjectURL(previewFile.url);
+      setPreviewFile(null);
+    }
   };
 
   const press = useCallback(
@@ -477,7 +583,7 @@ export default function Home() {
         <div className="result">{display}</div>
       </section>
 
-      {/* Mode Switch */}
+      {/* Mode Bar */}
       <div className="mode-row">
         <button
           className={!scientific ? "mode active" : "mode"}
@@ -640,14 +746,131 @@ export default function Home() {
         )}
       </section>
 
-      {/* Secret Vault Overlay (Calculator Vault Modal) */}
-      {vaultOpen && (
+      {/* Set Secret PIN Modal (First Time Setup) */}
+      {isSettingPin && (
         <div
           style={{
             position: "fixed",
             inset: 0,
             background: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(12px)",
+            backdropFilter: "blur(10px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              background: dark ? "#18181b" : "#fff",
+              color: dark ? "#fff" : "#18181b",
+              borderRadius: "16px",
+              padding: "24px",
+              width: "100%",
+              maxWidth: "360px",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <h3 style={{ margin: "0 0 8px 0", fontSize: "18px" }}>Set Secret Vault PIN</h3>
+            <p style={{ fontSize: "13px", color: "#71717a", marginBottom: "16px" }}>
+              Enter your own secret PIN. In the future, typing this PIN and pressing <strong>=</strong> will open your hidden vault.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <input
+                type="password"
+                maxLength={8}
+                placeholder="Enter 4-8 Digit PIN"
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+                style={{
+                  background: dark ? "#27272a" : "#f4f4f5",
+                  border: "1px solid #3f3f46",
+                  borderRadius: "8px",
+                  padding: "10px 12px",
+                  color: "inherit",
+                  fontSize: "15px",
+                  textAlign: "center",
+                  letterSpacing: "4px",
+                }}
+              />
+
+              <input
+                type="password"
+                maxLength={8}
+                placeholder="Confirm PIN"
+                value={confirmPin}
+                onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
+                style={{
+                  background: dark ? "#27272a" : "#f4f4f5",
+                  border: "1px solid #3f3f46",
+                  borderRadius: "8px",
+                  padding: "10px 12px",
+                  color: "inherit",
+                  fontSize: "15px",
+                  textAlign: "center",
+                  letterSpacing: "4px",
+                }}
+              />
+
+              {pinError && (
+                <small style={{ color: "#ef4444", fontSize: "12px", textAlign: "center" }}>
+                  {pinError}
+                </small>
+              )}
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                <button
+                  onClick={() => {
+                    setIsSettingPin(false);
+                    setNewPin("");
+                    setConfirmPin("");
+                    setPinError("");
+                  }}
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "1px solid #3f3f46",
+                    color: "inherit",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleSaveInitialPin}
+                  style={{
+                    flex: 1,
+                    background: "#2563eb",
+                    border: "none",
+                    color: "#fff",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                >
+                  Save PIN
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Secret Vault Overlay */}
+      {vaultOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.9)",
+            backdropFilter: "blur(14px)",
             zIndex: 9999,
             display: "flex",
             flexDirection: "column",
@@ -661,11 +884,14 @@ export default function Home() {
               <h2 style={{ margin: 0, fontSize: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
                 <span>🔒</span> Secret Vault
               </h2>
-              <small style={{ color: "#a1a1aa" }}>Hidden Photos, Videos & Files</small>
+              <small style={{ color: "#a1a1aa" }}>Stored privately on your device</small>
             </div>
 
             <button
-              onClick={() => setVaultOpen(false)}
+              onClick={() => {
+                closePreview();
+                setVaultOpen(false);
+              }}
               style={{
                 background: "rgba(255,255,255,0.1)",
                 border: "none",
@@ -680,7 +906,6 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Action Row */}
           <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -709,12 +934,11 @@ export default function Home() {
             />
           </div>
 
-          {/* Hidden Items Grid */}
           {vaultFiles.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 20px", color: "#71717a" }}>
               <div style={{ fontSize: "40px", marginBottom: "10px" }}>📁</div>
               <p style={{ margin: 0 }}>Your Vault is empty.</p>
-              <small>Click above to hide confidential photos or files.</small>
+              <small>Click above to hide confidential photos or files safely.</small>
             </div>
           ) : (
             <div
@@ -737,34 +961,19 @@ export default function Home() {
                     flexDirection: "column",
                   }}
                 >
-                  {file.type.startsWith("image/") ? (
-                    <img
-                      src={file.dataUrl}
-                      alt={file.name}
-                      onClick={() => setPreviewFile(file)}
-                      style={{ width: "100%", height: "110px", objectFit: "cover", cursor: "pointer" }}
-                    />
-                  ) : file.type.startsWith("video/") ? (
-                    <video
-                      src={file.dataUrl}
-                      onClick={() => setPreviewFile(file)}
-                      style={{ width: "100%", height: "110px", objectFit: "cover", cursor: "pointer" }}
-                    />
-                  ) : (
-                    <div
-                      onClick={() => setPreviewFile(file)}
-                      style={{
-                        height: "110px",
-                        display: "grid",
-                        placeItems: "center",
-                        fontSize: "36px",
-                        cursor: "pointer",
-                        background: "rgba(0,0,0,0.3)",
-                      }}
-                    >
-                      📄
-                    </div>
-                  )}
+                  <div
+                    onClick={() => openPreview(file)}
+                    style={{
+                      height: "110px",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: "36px",
+                      cursor: "pointer",
+                      background: "rgba(0,0,0,0.3)",
+                    }}
+                  >
+                    {file.type.startsWith("image/") ? "🖼️" : file.type.startsWith("video/") ? "🎬" : "📄"}
+                  </div>
 
                   <div style={{ padding: "8px", fontSize: "11px" }}>
                     <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -798,7 +1007,7 @@ export default function Home() {
               style={{
                 position: "fixed",
                 inset: 0,
-                background: "rgba(0,0,0,0.95)",
+                background: "rgba(0,0,0,0.96)",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -808,7 +1017,7 @@ export default function Home() {
               }}
             >
               <button
-                onClick={() => setPreviewFile(null)}
+                onClick={closePreview}
                 style={{
                   position: "absolute",
                   top: "20px",
@@ -825,15 +1034,15 @@ export default function Home() {
                 ✕ Close
               </button>
 
-              {previewFile.type.startsWith("image/") ? (
+              {previewFile.file.type.startsWith("image/") ? (
                 <img
-                  src={previewFile.dataUrl}
-                  alt={previewFile.name}
-                  style={{ maxWidth: "100%", maxHeight: "80vh", borderRadius: "10px" }}
+                  src={previewFile.url}
+                  alt={previewFile.file.name}
+                  style={{ maxWidth: "100%", maxHeight: "80vh", borderRadius: "10px", objectFit: "contain" }}
                 />
-              ) : previewFile.type.startsWith("video/") ? (
+              ) : previewFile.file.type.startsWith("video/") ? (
                 <video
-                  src={previewFile.dataUrl}
+                  src={previewFile.url}
                   controls
                   autoPlay
                   style={{ maxWidth: "100%", maxHeight: "80vh", borderRadius: "10px" }}
@@ -841,10 +1050,10 @@ export default function Home() {
               ) : (
                 <div style={{ textAlign: "center", color: "#fff" }}>
                   <div style={{ fontSize: "60px", marginBottom: "16px" }}>📄</div>
-                  <p>{previewFile.name}</p>
+                  <p>{previewFile.file.name}</p>
                   <a
-                    href={previewFile.dataUrl}
-                    download={previewFile.name}
+                    href={previewFile.url}
+                    download={previewFile.file.name}
                     style={{
                       display: "inline-block",
                       marginTop: "12px",
@@ -864,7 +1073,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Bottom Nav */}
+      {/* Bottom Navigation */}
       <nav className="bottom-nav">
         <Link href="/" className="nav-item active">
           <span>⌕</span>
