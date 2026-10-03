@@ -30,18 +30,42 @@ jobs:
       - name: Install Project Dependencies
         run: npm install
 
-      - name: Build Next.js Static Export
-        run: |
-          npm run build
-          if [ -d "out/calcpro" ]; then
-            cp -r out/calcpro/* out/ || true
-          fi
+      - name: Build Next.js App
+        run: npm run build
 
-      - name: Setup Capacitor v6 (Rock-Solid Stable)
+      - name: Setup Capacitor Platform
         run: |
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 --save
           rm -rf android
           npx cap add android
+
+      - name: Inject Custom App Logo / Icon
+        run: |
+          python3 -c '
+          import os, shutil
+
+          candidates = [
+              "public/android-chrome-512x512.png",
+              "public/icon-512x512.png",
+              "public/apple-touch-icon.png",
+              "public/favicon.png",
+              "public/favicon-32x32.png"
+          ]
+          src = None
+          for c in candidates:
+              if os.path.exists(c):
+                  src = c
+                  break
+
+          if src:
+              print(f"Found custom icon: {src}")
+              res_dir = "android/app/src/main/res"
+              for root, dirs, files in os.walk(res_dir):
+                  for f in files:
+                      if "ic_launcher" in f and f.endswith(".png"):
+                          dest = os.path.join(root, f)
+                          shutil.copyfile(src, dest)
+          '
           npx cap sync android
 
       - name: Build APK with Gradle
