@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { numberToIndianWords } from "../lib/numToWords";
 
-
 type HistoryItem = {
   expression: string;
   result: string;
@@ -289,7 +288,6 @@ export default function Home() {
       setShowVaultIntro(true);
     }
 
-    // Biometrics support check
     if (typeof window !== "undefined" && window.PublicKeyCredential) {
       PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
         .then((available) => setHasBiometrics(available))
@@ -419,7 +417,7 @@ export default function Home() {
         setVaultOpen(true);
       }
     } catch {
-      // Fallback to PIN
+      // Fallback
     }
   };
 
@@ -530,19 +528,35 @@ export default function Home() {
     }
   }, [expression, vaultPasscode, evaluateExpression, formatNumber]);
 
+  // Reliable cursor update with caret focus
   const updateInputCursor = (newPos: number) => {
     setCursorPos(newPos);
     if (inputRef.current) {
-      inputRef.current.setSelectionRange(newPos, newPos);
+      inputRef.current.focus({ preventScroll: true });
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.setSelectionRange(newPos, newPos);
+        }
+      });
     }
   };
 
   const moveCursor = (direction: "left" | "right") => {
     triggerHaptic();
     playKeySound();
-    const current = cursorPos;
-    const newPos = direction === "left" ? Math.max(0, current - 1) : Math.min(expression.length, current + 1);
-    updateInputCursor(newPos);
+
+    if (isCalculated) {
+      setIsCalculated(false);
+    }
+
+    const currentLen = expression.length;
+    const safePos = Math.min(Math.max(0, cursorPos), currentLen);
+    const nextPos =
+      direction === "left"
+        ? Math.max(0, safePos - 1)
+        : Math.min(currentLen, safePos + 1);
+
+    updateInputCursor(nextPos);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -887,29 +901,37 @@ export default function Home() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
           <div style={{ display: "flex", gap: "6px" }}>
             <button
+              type="button"
               onClick={() => moveCursor("left")}
               onMouseDown={(e) => e.preventDefault()}
               aria-label="Move cursor left"
               style={{
-                background: "rgba(255,255,255,0.08)",
-                color: "inherit",
-                borderRadius: "6px",
-                padding: "2px 8px",
-                fontSize: "12px",
+                background: dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)",
+                color: dark ? "#38bdf8" : "#0284c7",
+                border: `1px solid ${dark ? "rgba(56,189,248,0.3)" : "rgba(2,132,199,0.3)"}`,
+                borderRadius: "8px",
+                padding: "4px 12px",
+                fontSize: "14px",
+                fontWeight: "bold",
+                cursor: "pointer",
               }}
             >
               ◀
             </button>
             <button
+              type="button"
               onClick={() => moveCursor("right")}
               onMouseDown={(e) => e.preventDefault()}
               aria-label="Move cursor right"
               style={{
-                background: "rgba(255,255,255,0.08)",
-                color: "inherit",
-                borderRadius: "6px",
-                padding: "2px 8px",
-                fontSize: "12px",
+                background: dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)",
+                color: dark ? "#38bdf8" : "#0284c7",
+                border: `1px solid ${dark ? "rgba(56,189,248,0.3)" : "rgba(2,132,199,0.3)"}`,
+                borderRadius: "8px",
+                padding: "4px 12px",
+                fontSize: "14px",
+                fontWeight: "bold",
+                cursor: "pointer",
               }}
             >
               ▶
@@ -918,15 +940,17 @@ export default function Home() {
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {scientific && (
-              <span style={{ fontSize: "11px", color: "#3b82f6", fontWeight: "bold" }}>
+              <span style={{ fontSize: "11px", color: dark ? "#38bdf8" : "#0284c7", fontWeight: "bold" }}>
                 {isRad ? "RAD" : "DEG"}
               </span>
             )}
-            <small style={{ color: "#71717a", fontSize: "10px" }}>Tap text to position cursor</small>
+            <small style={{ color: dark ? "#71717a" : "#64748b", fontSize: "10px" }}>
+              Pos: {cursorPos}/{expression.length}
+            </small>
           </div>
         </div>
 
-        {/* Expression Input - Tap/Click se cursor position set hoga, keyboard nahi aayega */}
+        {/* Expression Input - Selection & Caret working without virtual keyboard */}
         <input
           ref={inputRef}
           type="text"
@@ -942,10 +966,9 @@ export default function Home() {
             const pos = target.selectionStart ?? expression.length;
             setCursorPos(pos);
           }}
-          onSelect={(e) => {
+          onKeyUp={(e) => {
             const target = e.target as HTMLInputElement;
-            const pos = target.selectionStart ?? expression.length;
-            setCursorPos(pos);
+            setCursorPos(target.selectionStart ?? expression.length);
           }}
           style={{
             background: "transparent",
@@ -953,24 +976,26 @@ export default function Home() {
             outline: "none",
             textAlign: "right",
             width: "100%",
-            color: "inherit",
+            color: dark ? "#ffffff" : "#0f172a",
             cursor: "text",
             overflowX: "auto",
-            caretColor: "#38bdf8",
+            caretColor: dark ? "#38bdf8" : "#0284c7",
           }}
         />
 
         {/* Bada Live Result Number */}
-        <div className="result">{display}</div>
+        <div className="result" style={{ color: dark ? "#ffffff" : "#0f172a" }}>
+          {display}
+        </div>
 
         {/* Real-time Indian Words representation */}
         {display && display !== "0" && display !== "Error" && (
           <div
             style={{
-              fontSize: "11px",
-              color: "#38bdf8",
+              fontSize: "12px",
+              color: dark ? "#38bdf8" : "#0284c7",
+              fontWeight: "600",
               marginTop: "4px",
-              opacity: 0.85,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -1024,7 +1049,7 @@ export default function Home() {
               playKeySound();
               setIsRad(!isRad);
             }}
-            style={{ fontWeight: "bold", color: "#38bdf8" }}
+            style={{ fontWeight: "bold", color: dark ? "#38bdf8" : "#0284c7" }}
           >
             {isRad ? "RAD" : "DEG"}
           </button>
@@ -1036,7 +1061,7 @@ export default function Home() {
               playKeySound();
               setIsSecond(!isSecond);
             }}
-            style={{ color: isSecond ? "#38bdf8" : "inherit" }}
+            style={{ color: isSecond ? (dark ? "#38bdf8" : "#0284c7") : "inherit" }}
           >
             2nd
           </button>
@@ -1222,19 +1247,19 @@ export default function Home() {
         >
           <div
             style={{
-              background: dark ? "#18181b" : "#fff",
-              color: dark ? "#fff" : "#18181b",
+              background: dark ? "#18181b" : "#ffffff",
+              color: dark ? "#ffffff" : "#0f172a",
               borderRadius: "16px",
               padding: "24px",
               maxWidth: "340px",
               textAlign: "center",
-              border: "1px solid rgba(255,255,255,0.1)",
+              border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
               boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
             }}
           >
             <div style={{ fontSize: "36px", marginBottom: "8px" }}>🔐</div>
             <h3 style={{ margin: "0 0 8px 0", fontSize: "18px" }}>Private Space Included</h3>
-            <p style={{ fontSize: "13px", color: "#a1a1aa", lineHeight: "1.5", margin: "0 0 16px 0" }}>
+            <p style={{ fontSize: "13px", color: dark ? "#a1a1aa" : "#64748b", lineHeight: "1.5", margin: "0 0 16px 0" }}>
               To access your secret vault anytime, enter <strong>1234</strong> and press <strong>=</strong>, or long-press the <strong>CalcPro</strong> title above.
             </p>
             <button
@@ -1274,18 +1299,18 @@ export default function Home() {
         >
           <div
             style={{
-              background: dark ? "#18181b" : "#fff",
-              color: dark ? "#fff" : "#18181b",
+              background: dark ? "#18181b" : "#ffffff",
+              color: dark ? "#ffffff" : "#0f172a",
               borderRadius: "16px",
               padding: "24px",
               width: "100%",
               maxWidth: "360px",
               boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
             }}
           >
             <h3 style={{ margin: "0 0 6px 0", fontSize: "18px" }}>Set Secret Vault PIN</h3>
-            <p style={{ fontSize: "12px", color: "#71717a", marginBottom: "14px" }}>
+            <p style={{ fontSize: "12px", color: dark ? "#a1a1aa" : "#64748b", marginBottom: "14px" }}>
               Enter your secret PIN. Add a recovery answer in case you forget it.
             </p>
 
@@ -1298,11 +1323,11 @@ export default function Home() {
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
                 style={{
-                  background: dark ? "#27272a" : "#f4f4f5",
-                  border: "1px solid #3f3f46",
+                  background: dark ? "#27272a" : "#f1f5f9",
+                  border: `1px solid ${dark ? "#3f3f46" : "#cbd5e1"}`,
                   borderRadius: "8px",
                   padding: "10px",
-                  color: "inherit",
+                  color: dark ? "#ffffff" : "#0f172a",
                   fontSize: "15px",
                   textAlign: "center",
                   letterSpacing: "4px",
@@ -1317,11 +1342,11 @@ export default function Home() {
                 value={confirmPin}
                 onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
                 style={{
-                  background: dark ? "#27272a" : "#f4f4f5",
-                  border: "1px solid #3f3f46",
+                  background: dark ? "#27272a" : "#f1f5f9",
+                  border: `1px solid ${dark ? "#3f3f46" : "#cbd5e1"}`,
                   borderRadius: "8px",
                   padding: "10px",
-                  color: "inherit",
+                  color: dark ? "#ffffff" : "#0f172a",
                   fontSize: "15px",
                   textAlign: "center",
                   letterSpacing: "4px",
@@ -1329,7 +1354,7 @@ export default function Home() {
               />
 
               <div style={{ textAlign: "left", marginTop: "4px" }}>
-                <span style={{ fontSize: "11px", color: "#a1a1aa" }}>Recovery: What is your birth city?</span>
+                <span style={{ fontSize: "11px", color: dark ? "#a1a1aa" : "#64748b" }}>Recovery: What is your birth city?</span>
                 <input
                   type="text"
                   placeholder="e.g. Delhi"
@@ -1338,11 +1363,11 @@ export default function Home() {
                   style={{
                     width: "100%",
                     marginTop: "4px",
-                    background: dark ? "#27272a" : "#f4f4f5",
-                    border: "1px solid #3f3f46",
+                    background: dark ? "#27272a" : "#f1f5f9",
+                    border: `1px solid ${dark ? "#3f3f46" : "#cbd5e1"}`,
                     borderRadius: "8px",
                     padding: "8px 10px",
-                    color: "inherit",
+                    color: dark ? "#ffffff" : "#0f172a",
                     fontSize: "13px",
                   }}
                 />
@@ -1366,7 +1391,7 @@ export default function Home() {
                   style={{
                     flex: 1,
                     background: "transparent",
-                    border: "1px solid #3f3f46",
+                    border: `1px solid ${dark ? "#3f3f46" : "#cbd5e1"}`,
                     color: "inherit",
                     padding: "10px",
                     borderRadius: "8px",
@@ -1414,23 +1439,23 @@ export default function Home() {
         >
           <div
             style={{
-              background: dark ? "#18181b" : "#fff",
-              color: dark ? "#fff" : "#18181b",
+              background: dark ? "#18181b" : "#ffffff",
+              color: dark ? "#ffffff" : "#0f172a",
               borderRadius: "16px",
               padding: "24px",
               width: "100%",
               maxWidth: "360px",
-              border: "1px solid rgba(255,255,255,0.1)",
+              border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
             }}
           >
             <h3 style={{ margin: "0 0 6px 0", fontSize: "18px" }}>🔑 PIN Recovery</h3>
-            <p style={{ fontSize: "12px", color: "#71717a", marginBottom: "16px" }}>
+            <p style={{ fontSize: "12px", color: dark ? "#a1a1aa" : "#64748b", marginBottom: "16px" }}>
               Emergency code verified. Answer your security question to reset your PIN.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <div style={{ textAlign: "left" }}>
-                <span style={{ fontSize: "12px", color: "#a1a1aa" }}>Question: What is your birth city?</span>
+                <span style={{ fontSize: "12px", color: dark ? "#a1a1aa" : "#64748b" }}>Question: What is your birth city?</span>
                 <input
                   type="text"
                   placeholder="Your answer"
@@ -1439,11 +1464,11 @@ export default function Home() {
                   style={{
                     width: "100%",
                     marginTop: "4px",
-                    background: dark ? "#27272a" : "#f4f4f5",
-                    border: "1px solid #3f3f46",
+                    background: dark ? "#27272a" : "#f1f5f9",
+                    border: `1px solid ${dark ? "#3f3f46" : "#cbd5e1"}`,
                     borderRadius: "8px",
                     padding: "10px",
-                    color: "inherit",
+                    color: dark ? "#ffffff" : "#0f172a",
                     fontSize: "14px",
                   }}
                 />
@@ -1457,11 +1482,11 @@ export default function Home() {
                 value={resetNewPin}
                 onChange={(e) => setResetNewPin(e.target.value.replace(/\D/g, ""))}
                 style={{
-                  background: dark ? "#27272a" : "#f4f4f5",
-                  border: "1px solid #3f3f46",
+                  background: dark ? "#27272a" : "#f1f5f9",
+                  border: `1px solid ${dark ? "#3f3f46" : "#cbd5e1"}`,
                   borderRadius: "8px",
                   padding: "10px",
-                  color: "inherit",
+                  color: dark ? "#ffffff" : "#0f172a",
                   fontSize: "15px",
                   textAlign: "center",
                   letterSpacing: "4px",
@@ -1485,7 +1510,7 @@ export default function Home() {
                   style={{
                     flex: 1,
                     background: "transparent",
-                    border: "1px solid #3f3f46",
+                    border: `1px solid ${dark ? "#3f3f46" : "#cbd5e1"}`,
                     color: "inherit",
                     padding: "10px",
                     borderRadius: "8px",
